@@ -132,12 +132,12 @@ public class SearchDaoImpl implements SearchDao {
         return resultGraphTraversal;
     }
 
-	private void updateValueList(Object value, List valueList) {
+	private void updateValueList(Object value, List<Object> valueList) {
 		valueList.add(value);
 	}
 
-	private List getValueList(Object value) {
-		List valueList = new ArrayList();
+	private List<Object> getValueList(Object value) {
+		List<Object> valueList = new ArrayList<>();
 		if (value instanceof List) {
 			for (Object o : (List) value) {
 				updateValueList(o, valueList);

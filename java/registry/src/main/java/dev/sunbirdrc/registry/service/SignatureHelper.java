@@ -38,7 +38,7 @@ public class SignatureHelper {
      */
     public JsonNode signJson(JsonNode rootNode) throws SignatureException.UnreachableException, SignatureException.CreationException {
         String entityType = rootNode.fieldNames().next();
-        Map signRes = generateSignature(rootNode);
+        Map<String, Object> signRes = generateSignature(rootNode);
 
         JsonNode newSignatureNode = convertMapToNode(entityType, signRes);
         addSignature(rootNode, entityType, newSignatureNode);
@@ -55,8 +55,8 @@ public class SignatureHelper {
      * @throws SignatureException.CreationException
      */
 
-    private Map generateSignature(JsonNode rootNode) throws SignatureException.UnreachableException, SignatureException.CreationException {
-        Map signReq = new HashMap<String, Object>();
+    private Map<String, Object> generateSignature(JsonNode rootNode) throws SignatureException.UnreachableException, SignatureException.CreationException {
+        Map<String, Object> signReq = new HashMap<>();
         signReq.put("entity", rootNode);
         Map<String, Object> signMap = (Map<String, Object>) signatureService.sign(signReq);
 

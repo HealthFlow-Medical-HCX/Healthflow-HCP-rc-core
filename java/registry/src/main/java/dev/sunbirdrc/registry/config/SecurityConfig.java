@@ -50,7 +50,16 @@ public class SecurityConfig extends KeycloakWebSecurityConfigurerAdapter {
     protected void configure(HttpSecurity http) throws Exception {
         super.configure(http);
 
-        http.csrf()
+        http
+            .headers()
+                .frameOptions().deny()
+                .contentTypeOptions().and()
+                .httpStrictTransportSecurity()
+                    .includeSubDomains(true)
+                    .maxAgeInSeconds(31536000)
+                .and()
+            .and()
+            .csrf()
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                 .ignoringAntMatchers("/api/v1/**")
             .and()

@@ -302,7 +302,7 @@ deploy() {
     
     echo "Service URLs:"
     echo "  - Registry API:     http://localhost:8081"
-    echo "  - Keycloak Admin:   http://localhost:8080 (admin/${KEYCLOAK_ADMIN_PASSWORD:-admin})"
+    echo "  - Keycloak Admin:   http://localhost:8080 (admin/********)"
     echo "  - Credentials API:  http://localhost:3000"
     echo "  - Identity Service: http://localhost:3332"
     echo "  - Bulk Issuance:    http://localhost:8085"

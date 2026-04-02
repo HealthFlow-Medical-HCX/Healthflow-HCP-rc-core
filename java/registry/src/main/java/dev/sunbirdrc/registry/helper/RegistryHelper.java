@@ -455,7 +455,7 @@ public class RegistryHelper {
                     uuidPropertyName
             );
             if (!parentURI.isPresent()) {
-                throw new Exception(parentURI + " does not exist");
+                throw new IllegalArgumentException("Parent URI does not exist: " + parentURIPointer);
             }
             parentNode = jsonNode.get(entityName).at(parentURI.get().getJsonPointer());
         }
@@ -471,7 +471,7 @@ public class RegistryHelper {
                 .fromEntityAndPropertyURI(updateNode.get(entityName), propertyURI, uuidPropertyName);
 
         if (!entityPropertyURI.isPresent()) {
-            throw new Exception(propertyURI + ": do not exist");
+            throw new IllegalArgumentException("Property URI does not exist: " + propertyURI);
         }
 
         JsonNode existingPropertyNode = updateNode.get(entityName).at(entityPropertyURI.get().getJsonPointer());

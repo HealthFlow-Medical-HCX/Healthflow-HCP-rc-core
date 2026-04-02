@@ -8,4 +8,5 @@ RUN npm ci
 COPY . ./
 RUN npm test
 USER appuser
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://localhost:${PORT:-8079}/health || exit 1
 CMD ["npm", "start"]

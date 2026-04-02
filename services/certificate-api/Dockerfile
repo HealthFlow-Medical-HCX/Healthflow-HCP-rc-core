@@ -21,4 +21,5 @@ RUN npm ci
 COPY . ./
 RUN chown -R appuser:appgroup /app
 USER appuser
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://localhost:${PORT:-8078}/health || exit 1
 CMD ["npm", "start"]

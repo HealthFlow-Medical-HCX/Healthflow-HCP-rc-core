@@ -64,7 +64,7 @@ public class RegistryController extends AbstractController {
             logger.error("Exception in controller while searching entities !", e);
             response.setResult("");
             responseParams.setStatus(Response.Status.UNSUCCESSFUL);
-            responseParams.setErrmsg(e.getMessage());
+            responseParams.setErrmsg("An error occurred while processing the request");
         }
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
@@ -86,7 +86,7 @@ public class RegistryController extends AbstractController {
             logger.error("Controller: UnsupportedOperationException while deleting entity !", e);
             response.setResult(null);
             responseParams.setStatus(Response.Status.UNSUCCESSFUL);
-            responseParams.setErrmsg(e.getMessage());
+            responseParams.setErrmsg("An error occurred while processing the request");
         } catch (Exception e) {
             logger.error("Controller: Exception while deleting entity !", e);
             response.setResult(null);
@@ -106,7 +106,7 @@ public class RegistryController extends AbstractController {
 
         try {
             String label = registryHelper.addEntity(rootNode, apiMessage.getUserID());
-            Map resultMap = new HashMap();
+            Map<String, Object> resultMap = new HashMap<>();
             resultMap.put(dbConnectionInfoMgr.getUuidPropertyName(), label);
 
             result.put(entityType, resultMap);
@@ -117,7 +117,7 @@ public class RegistryController extends AbstractController {
             logger.error("Exception in controller while adding entity !", e);
             response.setResult(result);
             responseParams.setStatus(Response.Status.UNSUCCESSFUL);
-            responseParams.setErrmsg(e.getMessage());
+            responseParams.setErrmsg("An error occurred while processing the request");
         }
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
@@ -148,7 +148,7 @@ public class RegistryController extends AbstractController {
             logger.info("ReadEntity,{},{}", resultNode.get(apiMessage.getRequest().getEntityType()).get(uuidPropertyName), config);
         } catch (Exception e) {
             logger.error("Read Api Exception occurred ", e);
-            responseParams.setErrmsg(e.getMessage());
+            responseParams.setErrmsg("An error occurred while processing the request");
             responseParams.setStatus(Response.Status.UNSUCCESSFUL);
         }
 
@@ -167,7 +167,7 @@ public class RegistryController extends AbstractController {
             logger.info("get registers,{}", registryList);
         } catch (Exception e) {
             logger.error("Read Api Exception occurred ", e);
-            responseParams.setErrmsg(e.getMessage());
+            responseParams.setErrmsg("An error occurred while processing the request");
             responseParams.setStatus(Response.Status.UNSUCCESSFUL);
         }
 
@@ -184,7 +184,7 @@ public class RegistryController extends AbstractController {
             logger.info("get registers,{}", entity);
         } catch (Exception e) {
             logger.error("Read Api Exception occurred ", e);
-            responseParams.setErrmsg(e.getMessage());
+            responseParams.setErrmsg("An error occurred while processing the request");
             responseParams.setStatus(Response.Status.UNSUCCESSFUL);
         }
 
@@ -207,7 +207,7 @@ public class RegistryController extends AbstractController {
         } catch (Exception e) {
             logger.error("RegistryController: Exception while updating entity (without id)!", e);
             responseParams.setStatus(Response.Status.UNSUCCESSFUL);
-            responseParams.setErrmsg(e.getMessage());
+            responseParams.setErrmsg("An error occurred while processing the request");
         }
         return new ResponseEntity<>(response, HttpStatus.OK);
     }

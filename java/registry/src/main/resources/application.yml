@@ -285,8 +285,8 @@ elastic:
 
 filestorage:
   url: ${filestorage_connection_url:http://localhost:9000}
-  accesskey: ${filestorage_access_key:XXXXX}
-  secretkey: ${filestorage_secret_key:XXXXX}
+  accesskey: ${filestorage_access_key:}
+  secretkey: ${filestorage_secret_key:}
   bucketname: ${filestorage_bucket_key:dummy}
 
 

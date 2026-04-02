@@ -1,4 +1,4 @@
-package in.divoc.api.authenticator;// File Name SendEmail.java
+package in.divoc.api.authenticator;
 
 import org.jboss.logging.Logger;
 
@@ -12,15 +12,21 @@ import java.nio.charset.StandardCharsets;
 
 public class EmailService {
     private static final Logger logger = Logger.getLogger(EmailService.class);
+    private static final String SENDINBLUE_API_URL = "https://api.sendinblue.com/v3/smtp/email";
 
     void sendEmail(String email, String otp) {
+        String apiKey = System.getenv("SENDINBLUE_API_KEY");
+        if (apiKey == null || apiKey.isEmpty()) {
+            logger.error("SENDINBLUE_API_KEY environment variable is not set");
+            return;
+        }
         try {
-            URL url = new URL("https://api.sendinblue.com/v3/smtp/email");
+            URL url = new URL(SENDINBLUE_API_URL);
             HttpURLConnection con = (HttpURLConnection) url.openConnection();
             con.setRequestMethod("POST");
             con.setRequestProperty("content-type", "application/json");
             con.setRequestProperty("accept", "application/json");
-            con.setRequestProperty("api-key", "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");
+            con.setRequestProperty("api-key", apiKey);
             con.setRequestProperty("Host", "api.sendinblue.com");
 
             con.setDoOutput(true);
@@ -29,17 +35,17 @@ public class EmailService {
                 byte[] input = jsonInputString.getBytes(StandardCharsets.UTF_8);
                 os.write(input, 0, input.length);
             }
-            try(BufferedReader br = new BufferedReader(
-                    new InputStreamReader(con.getInputStream(), "utf-8"))) {
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(con.getInputStream(), StandardCharsets.UTF_8))) {
                 StringBuilder response = new StringBuilder();
-                String responseLine = null;
+                String responseLine;
                 while ((responseLine = br.readLine()) != null) {
                     response.append(responseLine.trim());
                 }
-                System.out.println(response.toString());
+                logger.debug("Email API response received successfully");
             }
         } catch (IOException e) {
-            logger.error(e);
+            logger.error("Failed to send email", e);
         }
     }
 }

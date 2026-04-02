@@ -126,7 +126,7 @@ public class RegistryUtilsController {
 					arr = entityElement.getAsJsonArray();
 				}
 
-				Map verifyReq = new HashMap<String, Object>();
+				Map<String, Object> verifyReq = new HashMap<>();
 				List<Entity> entityList = new ArrayList<Entity>();
 
 				for (int i = 0; i < arr.size(); i++) {

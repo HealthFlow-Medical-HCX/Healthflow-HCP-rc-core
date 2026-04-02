@@ -373,7 +373,7 @@ public class RegistryEntityController extends AbstractController {
         try {
             Map<String, Object> otherClaims = ((KeycloakPrincipal) principal.getPrincipal()).getKeycloakSecurityContext().getToken().getOtherClaims();
             if (otherClaims.keySet().contains(dev.sunbirdrc.registry.Constants.KEY_CONSENT) && otherClaims.get(dev.sunbirdrc.registry.Constants.KEY_CONSENT) instanceof Map) {
-                Map consentFields = (Map) otherClaims.get(dev.sunbirdrc.registry.Constants.KEY_CONSENT);
+                Map<?, ?> consentFields = (Map<?, ?>) otherClaims.get(dev.sunbirdrc.registry.Constants.KEY_CONSENT);
                 for (Object key : consentFields.keySet()) {
                     fields.add(key.toString());
                 }

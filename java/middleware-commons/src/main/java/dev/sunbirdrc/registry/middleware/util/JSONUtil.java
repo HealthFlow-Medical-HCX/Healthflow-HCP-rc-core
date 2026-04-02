@@ -38,8 +38,7 @@ public class JSONUtil {
 	private static Logger logger = LoggerFactory.getLogger(JSONUtil.class);
 	private static Type stringObjMapType = new TypeToken<Map<String, Object>>() {
 	}.getType();
-	private static String key = "";
-	private static ObjectMapper objectMapper = new ObjectMapper();
+	private static final ObjectMapper objectMapper = new ObjectMapper();
 
 	public static Map<String, Object> convertObjectJsonMap(Object object) {
 		Gson gson = new Gson();
@@ -48,25 +47,19 @@ public class JSONUtil {
 	}
 
 	public static String convertObjectJsonString(Object object) throws JsonProcessingException {
-		String result = new ObjectMapper().writeValueAsString(object);
-		return result;
+		return objectMapper.writeValueAsString(object);
 	}
-	
-	public static JsonNode convertStringJsonNode(String jsonStr) throws IOException {
-		JsonNode jNode = new ObjectMapper().readTree(jsonStr);
-		return jNode;
-	}
-	
-	public static JsonNode convertObjectJsonNode(Object object) throws IOException {
-		JsonNode inputNode = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL).valueToTree(object);
 
-		return inputNode;
+	public static JsonNode convertStringJsonNode(String jsonStr) throws IOException {
+		return objectMapper.readTree(jsonStr);
+	}
+
+	public static JsonNode convertObjectJsonNode(Object object) throws IOException {
+		return objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL).valueToTree(object);
 	}
 
 	public static Map<String, Object> convertJsonNodeToMap(JsonNode object) {
-		ObjectMapper mapper = new ObjectMapper();
-		Map<String, Object> mapObject = new ObjectMapper().convertValue(object, Map.class);
-		return mapObject;
+		return objectMapper.convertValue(object, Map.class);
 	}
 
 	public static String getStringWithReplacedText(String payload, String value, String replacement) {
@@ -86,11 +79,9 @@ public class JSONUtil {
 			rootType = jsonObj.get("@type").getAsString();
 		}
 		String replacedframe = frame.replace("<@type>", rootType);
-		// JsonUtils.fromString(frame)
 		JsonLdOptions options = new JsonLdOptions();
 		options.setCompactArrays(true);
 		Map<String, Object> framedJsonLD = JsonLdProcessor.frame(reqMap, JsonUtils.fromString(replacedframe), options);
-		// json = gson.toJson(framedJsonLD);
 		String jsonld = JSONUtil.getStringWithReplacedText(gson.toJson(framedJsonLD), regex, EMPTY);
 		logger.info("frameJsonAndRemoveIds: json - ", jsonld);
 		return gson.fromJson(jsonld, stringObjMapType);
@@ -310,7 +301,7 @@ public class JSONUtil {
 					arrayNodePathsMap.get(parentPtr).add(Integer.parseInt(leafFieldName));
 				}
 			} else {
-				throw new Exception("Illegal Path");
+				throw new IllegalArgumentException("Illegal path: cannot remove from node type " + parent.getNodeType());
 			}
 		}
 		for (JsonPointer targetPtr: arrayNodePathsMap.keySet()) {
@@ -359,13 +350,15 @@ public class JSONUtil {
 		while (fields.hasNext()) {
 			Map.Entry<String, JsonNode> entry = fields.next();
 			if (entry.getValue().isTextual() && entry.getValue().textValue().equalsIgnoreCase(value)) {
-				key = entry.getKey();
-				break;
+				return entry.getKey();
 			} else if (entry.getValue().isObject()) {
-				findKey(entry.getValue(), value);
+				String found = findKey(entry.getValue(), value);
+				if (!found.isEmpty()) {
+					return found;
+				}
 			}
 		}
-		return key;
+		return "";
 	}
 
 	/**
@@ -424,7 +417,6 @@ public class JSONUtil {
 	 * @return
 	 */
 	public static JsonNode diffJsonNode(JsonNode existingNode, JsonNode latestNode) {
-		ObjectMapper objectMapper = new ObjectMapper();
 		if(existingNode == null) {
 			existingNode = objectMapper.createObjectNode();
 		}
@@ -482,6 +474,9 @@ public class JSONUtil {
     public static String readValFromJsonTree(String path, JsonNode input) {
         Configuration alwaysReturnListConfig = Configuration.builder().options(Option.ALWAYS_RETURN_LIST).build();
         List<String> typeList = JsonPath.using(alwaysReturnListConfig).parse(input.toString()).read(path);
+        if (typeList == null || typeList.isEmpty()) {
+            return "";
+        }
         return typeList.get(0);
     }
 
@@ -489,7 +484,10 @@ public class JSONUtil {
 		if (resultNode.isArray()) {
 			ArrayNode arrayNode = (ArrayNode) resultNode;
 			JsonNode matchingClaim = searchClaimOsIdFromRequestProperties(arrayNode,requestBody);
-			return matchingClaim!=null?matchingClaim.get("osid").asText():"";
+			if (matchingClaim == null || matchingClaim.get("osid") == null) {
+			return "";
+		}
+		return matchingClaim.get("osid").asText();
 		}
 		return "";
 	}
@@ -533,7 +531,7 @@ public class JSONUtil {
 			String path = entry.getValue();
 			String key = entry.getKey();
 			Object read = documentContext.read(path);
-			JsonNode readNode = new ObjectMapper().convertValue(read, JsonNode.class);
+			JsonNode readNode = objectMapper.convertValue(read, JsonNode.class);
 			result.set(key, readNode);
 			if(readNode.isArray() && propertiesOSIDMapper != null && propertiesOSIDMapper.containsKey(key)) {
 				List<String> osids = propertiesOSIDMapper.get(key);

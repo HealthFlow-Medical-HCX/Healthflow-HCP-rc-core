@@ -100,9 +100,11 @@ public class SqlgProvider extends DatabaseProvider {
     private void createIndexByIndexType(Graph graph, IndexType indexType, String label, List<String> propertyNames) {
         VertexLabel vertexLabel = getVertex(graph, label);
         for (String propertyName : propertyNames) {
-            List<PropertyColumn> properties = new ArrayList<>();
-            properties.add(vertexLabel.getProperty(propertyName).get());
-            ensureIndex(vertexLabel, indexType, properties);
+            vertexLabel.getProperty(propertyName).ifPresent(prop -> {
+                List<PropertyColumn> properties = new ArrayList<>();
+                properties.add(prop);
+                ensureIndex(vertexLabel, indexType, properties);
+            });
         }
     }
     /**
@@ -116,9 +118,11 @@ public class SqlgProvider extends DatabaseProvider {
         List<PropertyColumn> properties = new ArrayList<>();
 
         for (String propertyName : propertyNames) {
-            properties.add(vertexLabel.getProperty(propertyName).get());
+            vertexLabel.getProperty(propertyName).ifPresent(properties::add);
         }
-        ensureIndex(vertexLabel, IndexType.NON_UNIQUE, properties);
+        if (!properties.isEmpty()) {
+            ensureIndex(vertexLabel, IndexType.NON_UNIQUE, properties);
+        }
     }
     /**
      * Ensures that the vertex table exist in the db.

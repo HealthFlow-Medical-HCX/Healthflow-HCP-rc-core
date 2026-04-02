@@ -34,7 +34,6 @@ public class SunbirdActorFactory {
     public void init(String name) {
         createActorSystem(name);
         createRouter();
-        //createDeadLetterActor();
         initActors();
         printCache();
     }
@@ -112,7 +111,7 @@ public class SunbirdActorFactory {
         try {
             dispatcher = configProcessor.getConfig().getString(completePath);
         } catch (ConfigException missingConfig) {
-            // System.out.println("Dispatcher not provided and so default");
+            // Dispatcher not configured, using default
         }
         return dispatcher;
     }
@@ -140,14 +139,6 @@ public class SunbirdActorFactory {
 
         return actorRef;
     }
-
-    // TODO - would it make sense to have a dead letter watcher and send back
-    // an "unreachable" event for all types of messages - tell and ask?
-//    private void createDeadLetterActor() {
-//        final ActorRef actor = actorSystem.actorOf(Props.create(DeadLetterActor.class));
-//        actorSystem.eventStream().subscribe(actor, DeadLetter.class);
-//    }
-
 
     private void printCache() {
         ActorCache.instance().print();

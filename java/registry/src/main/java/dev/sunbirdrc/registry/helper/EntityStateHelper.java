@@ -159,7 +159,7 @@ public class EntityStateHelper {
 
         Optional<EntityPropertyURI> entityPropertyURI = EntityPropertyURI.fromEntityAndPropertyURI(entityNode, propertyURL, uuidPropertyName);
         if (!entityPropertyURI.isPresent()) {
-            throw new Exception("Invalid Property Identifier : " + propertyURL);
+            throw new IllegalArgumentException("Invalid Property Identifier: " + propertyURL);
         }
         Pair<ObjectNode, JsonPointer> metadataNodePointer = getTargetMetadataNodeInfo(entityNode, entityPropertyURI.get().getJsonPointer());
 

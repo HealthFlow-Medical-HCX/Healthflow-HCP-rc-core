@@ -1,6 +1,6 @@
-FROM jboss/keycloak:14.0.0
+FROM quay.io/keycloak/keycloak:24.0
 
-ADD themes /opt/jboss/keycloak/themes
-ADD providers /opt/jboss/keycloak/providers
+COPY themes /opt/keycloak/themes
+COPY providers /opt/keycloak/providers
 
-ENTRYPOINT ["/opt/jboss/tools/docker-entrypoint.sh"]
+ENTRYPOINT ["/opt/keycloak/bin/kc.sh"]

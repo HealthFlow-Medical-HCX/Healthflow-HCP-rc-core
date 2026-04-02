@@ -309,8 +309,6 @@ public class RegistryServiceImpl implements RegistryService {
             removeKeys.add(uuidPropertyName);
             removeKeys.add(Constants.TYPE_STR_JSON_LD);
             JSONUtil.removeNodes((ObjectNode) validationNode, removeKeys);
-//            iValidate.validate(entityNodeType, mergedNode.toString());
-//            logger.debug("Validated payload before update");
 
             // Finally update
             // Input nodes have shard labels

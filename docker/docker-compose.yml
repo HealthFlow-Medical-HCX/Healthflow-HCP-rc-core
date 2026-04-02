@@ -19,7 +19,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-healthflow}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -39,7 +39,7 @@ services:
     image: redis:7-alpine
     container_name: healthflow-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
     ports:
       - "6379:6379"
     volumes:
@@ -183,7 +183,7 @@ services:
       KC_HEALTH_ENABLED: "true"
     ports:
       - "8080:8080"
-    command: start-dev --import-realm
+    command: start --import-realm --optimized
     volumes:
       - ./configs/keycloak:/opt/keycloak/data/import:ro
     networks:
@@ -616,7 +616,7 @@ services:
   # ===========================================================================
   
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-01-31T20-20-33Z
     container_name: healthflow-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -656,6 +656,10 @@ services:
       - nginx_logs:/var/log/nginx
     networks:
       - healthflow-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
 # =============================================================================
 # NETWORKS & VOLUMES
