@@ -559,6 +559,125 @@ Project targets Java 1.8 which is end-of-life. Missing security patches and mode
 
 ---
 
+## ADDITIONAL FINDINGS (Code Quality Deep Dive)
+
+### Q1. Broken Double-Checked Locking Singleton (CRITICAL)
+
+**File**: `java/sunbird-actor/src/main/java/org/sunbird/akka/core/ActorCache.java:14-37`
+
+```java
+private static ActorCache cacheRef = null;
+private static Boolean localLock = false;  // Not volatile!
+
+public static ActorCache instance() {
+    if (!localLock) {  // First check without synchronization
+        synchronized (localLock) {  // Synchronizing on mutable Boolean object!
+            localLock = Boolean.TRUE;
+            if (null == cacheRef) {
+                cacheRef = new ActorCache();
+            }
+        }
+    }
+    return cacheRef;
+}
+```
+
+Three critical bugs: (1) `localLock` is not `volatile` - visibility issue across threads, (2) synchronizing on a `Boolean` instance which gets autoboxed to a different object when reassigned, (3) improper double-checked locking pattern. This can cause race conditions, duplicate singleton creation, or deadlocks.
+
+**Remediation**: Use `volatile` + proper lock object, or use enum singleton / `Holder` pattern.
+
+---
+
+### Q2. ObjectMapper Created 97 Times (HIGH)
+
+`new ObjectMapper()` is instantiated ~97 times across the codebase instead of being injected as a singleton. ObjectMapper construction is expensive and this causes:
+- Unnecessary memory allocation and GC pressure
+- Inconsistent serialization configurations across the app
+
+**Key files**: `java/middleware-commons/src/main/java/dev/sunbirdrc/registry/middleware/util/JSONUtil.java` (lines 42, 51, 56, 61, 68, 108) and throughout all modules.
+
+**Remediation**: Use Spring-injected singleton `ObjectMapper` bean.
+
+---
+
+### Q3. Unclosed Resources (HIGH)
+
+**File**: `java/registry/src/main/java/dev/sunbirdrc/registry/util/OSResourceLoader.java:60-62`
+
+```java
+InputStream is = resource.getInputStream();
+byte[] encoded = IOUtils.toByteArray(is);  // stream never closed
+```
+
+**File**: `java/.mvn/wrapper/MavenWrapperDownloader.java:58-69` - `FileInputStream` managed manually without try-with-resources.
+
+---
+
+### Q4. Unsafe Array Access Without Bounds Checking (HIGH)
+
+**File**: `java/registry/src/main/java/dev/sunbirdrc/registry/helper/RegistryHelper.java:716`
+
+```java
+return request.getRequestURI().split(entityId + "/")[1];  // Index 1 may not exist
+```
+
+**File**: `java/registry/src/main/java/dev/sunbirdrc/registry/helper/RegistryHelper.java:842`
+
+```java
+return propertyURI.split("/")[0];  // May throw ArrayIndexOutOfBoundsException
+```
+
+---
+
+### Q5. Missing Null Checks on Chained Calls (HIGH)
+
+**File**: `java/registry/src/main/java/dev/sunbirdrc/registry/controller/RegistryClaimsController.java:64`
+
+```java
+JsonNode claims = claimRequestClient.getClaims(result.get(entityName).get(0), entityName);
+// Triple chaining without null checks: result.get() -> .get(0) -> NPE risk
+```
+
+**File**: `java/registry/src/main/java/dev/sunbirdrc/registry/controller/RegistryClaimsController.java:136-138`
+
+```java
+String entityName = requestBody.get("entityName").asText();  // No null check
+String entityId = requestBody.get("entityId").asText();      // No null check
+String attestationName = requestBody.get("name").asText();   // No null check
+```
+
+---
+
+### Q6. Empty Catch Block in Test (MEDIUM)
+
+**File**: `java/registry/src/test/java/dev/sunbirdrc/registry/service/impl/RegistryServiceImplTest.java:104`
+
+```java
+} catch (Exception e) {}  // Silently swallows exceptions
+```
+
+---
+
+### Q7. System.out.println Instead of Logger (MEDIUM)
+
+**File**: `java/sunbird-actor/src/main/java/org/sunbird/akka/core/ActorCache.java:68,71`
+**File**: `java/sunbird-actor/src/main/java/org/sunbird/akka/core/SunbirdActorFactory.java:94`
+
+Production actor framework code uses `System.out.println()` instead of SLF4J logger.
+
+---
+
+## UPDATED SUMMARY
+
+| Category | Critical | High | Medium | Low | Total |
+|----------|----------|------|--------|-----|-------|
+| Security | 8 | 11 | 7 | 3 | 29 |
+| Reliability | 4 | 8 | 5 | 2 | 19 |
+| Maintainability | 1 | 5 | 8 | 5 | 19 |
+| **Total** | **13** | **24** | **20** | **10** | **67** |
+
+---
+
 ## RECOMMENDED PRIORITY ACTIONS
 
 ### Immediate (P0 - Critical)
