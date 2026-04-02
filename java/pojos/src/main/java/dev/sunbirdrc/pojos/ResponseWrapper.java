@@ -32,7 +32,7 @@ public class ResponseWrapper extends ContentCachingResponseWrapper {
 	 * @return
 	 */
 	public void writeResponseBody(String content) {
-		logger.info("Response content:" + content);
+		logger.debug("Writing response body (length: {})", content != null ? content.length() : 0);
 		BufferedWriter bufferedWriter = null;
 		try {
 			OutputStream outputStream = this.getResponse().getOutputStream();

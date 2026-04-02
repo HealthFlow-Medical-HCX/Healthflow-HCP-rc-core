@@ -27,8 +27,7 @@ public class FrameContext {
 			frameContent = new String(ByteStreams.toByteArray(in), StandardCharsets.UTF_8);
 
 		} catch (Exception e1) {
-			e1.printStackTrace();
-			logger.error(e1.getLocalizedMessage());
+			logger.error("Error loading frame file {}", frameFileName, e1);
 
 		}
 	}
@@ -40,16 +39,16 @@ public class FrameContext {
      * Always return one domain that the registry represents
      * @return
      */
+	private static final ObjectMapper mapper = new ObjectMapper();
+
 	public String getDomain() {
-		ObjectMapper mapper = new ObjectMapper();
 		JsonNode frameNode = null;
 		logger.debug(
 				"for FrameContext registryContextBase: " + registryContextBase + " and frame content: " + frameContent);
 		try {
 			frameNode = mapper.readTree(getContent());
 		} catch (IOException e) {
-			e.printStackTrace();
-			logger.error(e.getLocalizedMessage());
+			logger.error("Error parsing frame content", e);
 		}
 		return JSONUtil.findKey(frameNode, registryContextBase);
 	}

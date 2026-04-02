@@ -554,7 +554,6 @@ public class RegistryHelper {
                     fileStorageService.save(new ByteArrayInputStream(file.getFile()), propertyURI);
                 } catch (Exception e) {
                     logger.error("Failed persisting file", e);
-                    e.printStackTrace();
                 }
                 fileUris.add(propertyURI);
             });
@@ -713,7 +712,11 @@ public class RegistryHelper {
     }
 
     public String getPropertyURI(String entityId, HttpServletRequest request) {
-        return request.getRequestURI().split(entityId + "/")[1];
+        String[] parts = request.getRequestURI().split(entityId + "/", 2);
+        if (parts.length < 2) {
+            throw new IllegalArgumentException("Invalid request URI: missing property path after entityId");
+        }
+        return parts[1];
     }
 
     @NotNull

@@ -125,8 +125,7 @@ public class Router extends BaseActor {
                     public void onComplete(Throwable failure, Object result) {
                         if (failure != null) {
                             // We got a failure, handle it here
-                            logger.error(failure.getMessage(), failure);
-                            failure.printStackTrace();
+                            logger.error("Actor routing failure: {}", failure.getMessage(), failure);
                         }
                         onResponse(message, result, failure);
                     }

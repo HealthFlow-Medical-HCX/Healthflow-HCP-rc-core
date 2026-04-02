@@ -64,7 +64,7 @@ public class KeycloakAdminUtil {
     }
 
     public String createUser(String entityName, String userName, String email, String mobile) throws OwnerCreationException {
-        logger.info("Creating user with mobile_number : " + userName);
+        logger.info("Creating user for entity: {}", entityName);
         UserRepresentation newUser = createUserRepresentation(entityName, userName, email, mobile);
         GroupRepresentation entityGroup = createGroupRepresentation(entityName);
         keycloak.realm(realm).groups().add(entityGroup);

@@ -56,15 +56,12 @@ public class OSResourceLoader {
      */
     private String getContent(Resource resource) {
         String content = null;
-        try {
-            InputStream is = resource.getInputStream();
+        try (InputStream is = resource.getInputStream()) {
             byte[] encoded = IOUtils.toByteArray(is);
             content = new String(encoded, Charset.forName("UTF-8"));
-
         } catch (IOException e) {
-            logger.error("Cannot load resource " + resource.getFilename());
-
-        } 
+            logger.error("Cannot load resource {}", resource.getFilename(), e);
+        }
         return content;
     }
 

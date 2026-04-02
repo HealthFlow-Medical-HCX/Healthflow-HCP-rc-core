@@ -18,6 +18,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 import org.apache.http.HttpHost;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
 import org.elasticsearch.action.admin.indices.create.CreateIndexResponse;
@@ -44,10 +46,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 
+import javax.annotation.PreDestroy;
+
 public class ElasticServiceImpl implements IElasticService {
-    private static Map<String, Set<String>> indexWiseExcludeFields = new HashMap<>();
-    private static Map<String, RestHighLevelClient> esClient = new HashMap<String, RestHighLevelClient>();
-    private static Logger logger = LoggerFactory.getLogger(ElasticServiceImpl.class);
+    private static final Map<String, Set<String>> indexWiseExcludeFields = new ConcurrentHashMap<>();
+    private static final Map<String, RestHighLevelClient> esClient = new ConcurrentHashMap<>();
+    private static final Logger logger = LoggerFactory.getLogger(ElasticServiceImpl.class);
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    /** Pattern to sanitize Elasticsearch query string special characters */
+    private static final Pattern ES_QUERY_SPECIAL_CHARS = Pattern.compile("[+\\-=&|><!(){}\\[\\]^\"~*?:\\\\/]");
 
     private static String connectionInfo;
     private static String searchType;
@@ -61,14 +69,11 @@ public class ElasticServiceImpl implements IElasticService {
     }
 
     /**
-     * This method runs when the application is started in order to add all the indcies to the elastic search
-     *
-     * @param indices
-     * @throws RuntimeException
+     * This method runs when the application is started in order to add all the indices to the elastic search
      */
-    public void init(Set<String> indices, Map<String, Set<String>> indexWiseExcludeFields) throws RuntimeException {
-        this.indexWiseExcludeFields = indexWiseExcludeFields;
-        indices.iterator().forEachRemaining(index -> {
+    public void init(Set<String> indices, Map<String, Set<String>> excludeFields) throws RuntimeException {
+        indexWiseExcludeFields.putAll(excludeFields);
+        indices.forEach(index -> {
             try {
                 addIndex(index.toLowerCase(), searchType);
             } catch (IOException e) {
@@ -77,191 +82,134 @@ public class ElasticServiceImpl implements IElasticService {
         });
     }
 
-    /**
-     * This method creates the high-level-client w.r.to index, if client is not created. for every index one client object is created
-     *
-     * @param indexName      for ElasticSearch
-     * @param connectionInfo of ElasticSearch
-     */
+    @PreDestroy
+    public void cleanup() {
+        esClient.forEach((index, client) -> {
+            try {
+                client.close();
+            } catch (IOException e) {
+                logger.error("Error closing ES client for index {}", index, e);
+            }
+        });
+        esClient.clear();
+    }
+
     private static void createClient(String indexName, String connectionInfo) {
-        if (!esClient.containsKey(indexName)) {
-            Map<String, Integer> hostPort = new HashMap<String, Integer>();
+        esClient.computeIfAbsent(indexName, key -> {
+            Map<String, Integer> hostPort = new HashMap<>();
             for (String info : connectionInfo.split(",")) {
-                hostPort.put(info.split(":")[0], Integer.valueOf(info.split(":")[1]));
+                String[] parts = info.split(":");
+                hostPort.put(parts[0], Integer.valueOf(parts[1]));
             }
             List<HttpHost> httpHosts = new ArrayList<>();
             for (String host : hostPort.keySet()) {
                 httpHosts.add(new HttpHost(host, hostPort.get(host)));
             }
-            RestHighLevelClient client = new RestHighLevelClient(
-                    RestClient.builder(httpHosts.toArray(new HttpHost[httpHosts.size()])));
-            if (null != client)
-                esClient.put(indexName, client);
-        }
+            return new RestHighLevelClient(
+                    RestClient.builder(httpHosts.toArray(new HttpHost[0])));
+        });
     }
 
-    /**
-     * Get client details from map
-     *
-     * @param indexName of ElasticSearch
-     * @return
-     */
     private static RestHighLevelClient getClient(String indexName) {
-        logger.info("connection info: index:{} connectioninfo:{}", indexName, connectionInfo);
-        if (null == esClient.get(indexName)) {
-            createClient(indexName, connectionInfo);
-        }
-        logger.info("resthighclient obj:" + esClient.get(indexName));
+        logger.debug("connection info: index:{} connectioninfo:{}", indexName, connectionInfo);
+        createClient(indexName, connectionInfo);
         return esClient.get(indexName);
     }
 
-    /**
-     * creates index for elastic-search
-     *
-     * @param indexName    of ElasticSearch
-     * @param documentType of ElasticSearch
-     * @return
-     * @throws IOException
-     */
     @Retryable(value = {IOException.class, ConnectException.class}, maxAttemptsExpression = "#{${service.retry.maxAttempts}}",
             backoff = @Backoff(delayExpression = "#{${service.retry.backoff.delay}}"))
     public static boolean addIndex(String indexName, String documentType) throws IOException {
         boolean response = false;
-        //To do need to analysis regarding settings and analysis and modify this code later
-        /*String settings = "{\"analysis\": {       \"analyzer\": {         \"doc_index_analyzer\": {           \"type\": \"custom\",           \"tokenizer\": \"standard\",           \"filter\": [             \"lowercase\",             \"mynGram\"           ]         },         \"doc_search_analyzer\": {           \"type\": \"custom\",           \"tokenizer\": \"standard\",           \"filter\": [             \"standard\",             \"lowercase\"           ]         },         \"keylower\": {           \"tokenizer\": \"keyword\",           \"filter\": \"lowercase\"         }       },       \"filter\": {         \"mynGram\": {           \"type\": \"nGram\",           \"min_gram\": 1,           \"max_gram\": 20,           \"token_chars\": [             \"letter\",             \"digit\",             \"whitespace\",             \"punctuation\",             \"symbol\"           ]         }       }     }   }";
-        String mappings = "{\"dynamic_templates\":[{\"longs\":{\"match_mapping_type\":\"long\",\"mapping\":{\"type\":\"long\",\"fields\":{\"raw\":{\"type\":\"long\"}}}}},{\"booleans\":{\"match_mapping_type\":\"boolean\",\"mapping\":{\"type\":\"boolean\",\"fields\":{\"raw\":{\"type\":\"boolean\"}}}}},{\"doubles\":{\"match_mapping_type\":\"double\",\"mapping\":{\"type\":\"double\",\"fields\":{\"raw\":{\"type\":\"double\"}}}}},{\"dates\":{\"match_mapping_type\":\"date\",\"mapping\":{\"type\":\"date\",\"fields\":{\"raw\":{\"type\":\"date\"}}}}},{\"strings\":{\"match_mapping_type\":\"string\",\"mapping\":{\"type\":\"text\",\"copy_to\":\"all_fields\",\"analyzer\":\"doc_index_analyzer\",\"search_analyzer\":\"doc_search_analyzer\",\"fields\":{\"raw\":{\"type\":\"text\",\"analyzer\":\"keylower\"}}}}}],\"properties\":{\"all_fields\":{\"type\":\"text\",\"analyzer\":\"doc_index_analyzer\",\"search_analyzer\":\"doc_search_analyzer\",\"fields\":{\"raw\":{\"type\":\"text\",\"analyzer\":\"keylower\"}}}}}";*/
         RestHighLevelClient client = getClient(indexName);
         if (!isIndexExists(indexName)) {
             CreateIndexRequest createRequest = new CreateIndexRequest(indexName);
-
-            /*if (StringUtils.isNotBlank(settings))
-               createRequest.settings(Settings.builder().loadFromSource(settings, XContentType.JSON));
-            if (StringUtils.isNotBlank(documentType) && StringUtils.isNotBlank(mappings))
-                createRequest.mapping(documentType, mappings, XContentType.JSON);*/
             CreateIndexResponse createIndexResponse = client.indices().create(createRequest, RequestOptions.DEFAULT);
-
             response = createIndexResponse.isAcknowledged();
         }
         return response;
     }
 
-    /**
-     * checks whether input index exists in the elastic-search
-     *
-     * @param indexName of elastic-search
-     * @return
-     */
     public static boolean isIndexExists(String indexName) {
         Response response;
         try {
             response = getClient(indexName).getLowLevelClient().performRequest(new Request("HEAD", "/" + indexName));
             return (200 == response.getStatusLine().getStatusCode());
         } catch (IOException e) {
+            logger.warn("Failed to check if index {} exists", indexName, e);
             return false;
         }
-
     }
 
-    /**
-     * Adds input as document into elastic-search
-     *
-     * @param index       - ElasticSearch Index
-     * @param entityId    - entity id as document id
-     * @param inputEntity - input document for adding
-     * @return
-     */
     @Override
     public RestStatus addEntity(String index, String entityId, JsonNode inputEntity) {
         logger.debug("addEntity starts with index {} and entityId {}", index, entityId);
-        IndexResponse response = null;
         try {
             DocumentContext doc = getDocumentContextAfterRemovingExcludedFields(index, inputEntity);
             JsonNode filteredNode = JSONUtil.convertStringJsonNode(doc.jsonString());
             Map<String, Object> inputMap = JSONUtil.convertJsonNodeToMap(filteredNode);
-            response = getClient(index).index(new IndexRequest(index, searchType, entityId).source(inputMap), RequestOptions.DEFAULT);
+            IndexResponse response = getClient(index).index(new IndexRequest(index, searchType, entityId).source(inputMap), RequestOptions.DEFAULT);
+            return response.status();
         } catch (IOException e) {
             logger.error("Exception in adding record to ElasticSearch", e);
+            return RestStatus.INTERNAL_SERVER_ERROR;
         }
-        return response.status();
     }
 
-    /**
-     * Reads the document from Elastic search
-     *
-     * @param index - ElasticSearch Index
-     * @param osid  - which maps to document
-     * @return
-     */
     @Override
     @Retryable(value = {IOException.class, ConnectException.class}, maxAttemptsExpression = "#{${service.retry.maxAttempts}}",
             backoff = @Backoff(delayExpression = "#{${service.retry.backoff.delay}}"))
     public Map<String, Object> readEntity(String index, String osid) throws IOException {
         logger.debug("readEntity starts with index {} and entityId {}", index, osid);
-        
-        GetResponse response = null;
-        response = getClient(index).get(new GetRequest(index, searchType, osid), RequestOptions.DEFAULT);
+        GetResponse response = getClient(index).get(new GetRequest(index, searchType, osid), RequestOptions.DEFAULT);
         return response.getSourceAsMap();
     }
-    
 
-    /**
-     * Updates the document with updated inputEntity
-     *
-     * @param index       - ElasticSearch Index
-     * @param osid        - which maps to document
-     * @param inputEntity - input json document for updating
-     * @return
-     */
     @Override
     public RestStatus updateEntity(String index, String osid, JsonNode inputEntity) {
         logger.debug("updateEntity starts with index {} and entityId {}", index, osid);
-        UpdateResponse response = null;
         try {
             DocumentContext doc = getDocumentContextAfterRemovingExcludedFields(index, inputEntity);
             JsonNode filteredNode = JSONUtil.convertStringJsonNode(doc.jsonString());
             Map<String, Object> inputMap = JSONUtil.convertJsonNodeToMap(filteredNode);
             logger.debug("updateEntity inputMap {}", inputMap);
-            logger.debug("updateEntity inputEntity {}", inputEntity);
-            response = getClient(index.toLowerCase()).update(new UpdateRequest(index.toLowerCase(), searchType, osid).doc(inputMap), RequestOptions.DEFAULT);
+            UpdateResponse response = getClient(index.toLowerCase()).update(new UpdateRequest(index.toLowerCase(), searchType, osid).doc(inputMap), RequestOptions.DEFAULT);
+            return response.status();
         } catch (IOException e) {
             logger.error("Exception in updating a record to ElasticSearch", e);
+            return RestStatus.INTERNAL_SERVER_ERROR;
         }
-        return response.status();
     }
 
     private DocumentContext getDocumentContextAfterRemovingExcludedFields(String index, JsonNode inputEntity) throws com.fasterxml.jackson.core.JsonProcessingException {
         DocumentContext doc = JsonPath.parse(JSONUtil.convertObjectJsonString(inputEntity));
-        for (String jsonPath : indexWiseExcludeFields.get(index)) {
-            try {
-                doc.delete(jsonPath);
-            } catch (Exception e) {
-                logger.error("Path not found {} {}", jsonPath, e.getMessage());
+        Set<String> excludeFields = indexWiseExcludeFields.get(index);
+        if (excludeFields != null) {
+            for (String jsonPath : excludeFields) {
+                try {
+                    doc.delete(jsonPath);
+                } catch (Exception e) {
+                    logger.debug("Path not found {} {}", jsonPath, e.getMessage());
+                }
             }
         }
         return doc;
     }
 
-    /**
-     * Updates the document status to inactive into elastic-search
-     *
-     * @param index - ElasticSearch Index
-     * @param osid  - which maps to document
-     * @return
-     */
     @Override
     public RestStatus deleteEntity(String index, String osid) {
-        UpdateResponse response = null;
         try {
             String indexL = index.toLowerCase();
             Map<String, Object> readMap = readEntity(indexL, osid);
-           // Map<String, Object> entityMap = (Map<String, Object>) readMap.get(index);
+            if (readMap == null) {
+                return RestStatus.NOT_FOUND;
+            }
             readMap.put(Constants.STATUS_KEYWORD, Constants.STATUS_INACTIVE);
-            response = getClient(indexL).update(new UpdateRequest(indexL, searchType, osid).doc(readMap), RequestOptions.DEFAULT);
+            UpdateResponse response = getClient(indexL).update(new UpdateRequest(indexL, searchType, osid).doc(readMap), RequestOptions.DEFAULT);
+            return response.status();
         } catch (NullPointerException | IOException e) {
-            logger.error("exception in deleteEntity {}", e);
+            logger.error("Exception in deleteEntity for index {} osid {}", index, osid, e);
             return RestStatus.NOT_FOUND;
         }
-        return response.status();
     }
 
     @Override
@@ -276,27 +224,28 @@ public class ElasticServiceImpl implements IElasticService {
                 .from(searchQuery.getOffset());
         SearchRequest searchRequest = new SearchRequest(index).source(sourceBuilder);
         ArrayNode resultArray = JsonNodeFactory.instance.arrayNode();
-        ObjectMapper mapper = new ObjectMapper();
-            SearchResponse searchResponse = getClient(index).search(searchRequest, RequestOptions.DEFAULT);
-            for (SearchHit hit : searchResponse.getHits()) {
-                JsonNode node = mapper.readValue(hit.getSourceAsString(), JsonNode.class);
-                // TODO: Add draft mode condition
-                if(node.get("_status") == null || node.get("_status").asBoolean()) {
-                    resultArray.add(node);
-                }
+        SearchResponse searchResponse = getClient(index).search(searchRequest, RequestOptions.DEFAULT);
+        for (SearchHit hit : searchResponse.getHits()) {
+            JsonNode node = objectMapper.readValue(hit.getSourceAsString(), JsonNode.class);
+            if (node.get("_status") == null || node.get("_status").asBoolean()) {
+                resultArray.add(node);
             }
-            logger.debug("Total search records found " + resultArray.size());
+        }
+        logger.debug("Total search records found {}", resultArray.size());
 
         return resultArray;
-
     }
 
     /**
-     * Builds the final query builder for given searchQuery
-     *
-     * @param searchQuery
-     * @return
+     * Sanitize user input for Elasticsearch query string to prevent injection
      */
+    private String sanitizeQueryString(String input) {
+        if (input == null) {
+            return "";
+        }
+        return ES_QUERY_SPECIAL_CHARS.matcher(input).replaceAll("\\\\$0");
+    }
+
     private BoolQueryBuilder buildQuery(SearchQuery searchQuery) {
         List<Filter> filters = searchQuery.getFilters();
         BoolQueryBuilder query = QueryBuilders.boolQuery();
@@ -338,7 +287,6 @@ public class ElasticServiceImpl implements IElasticService {
                 List<Object> values = (List<Object>) value;
                 query = query.must(QueryBuilders.termsQuery(String.format("%s.keyword", field), values));
                 break;
-
             case contains:
                 query = query.must(QueryBuilders.matchPhraseQuery(field, value));
                 break;
@@ -356,9 +304,9 @@ public class ElasticServiceImpl implements IElasticService {
                 break;
             case notEndsWith:
                 query = query.mustNot(QueryBuilders.wildcardQuery(field, "*" + value));
-                break;                
+                break;
             case queryString:
-                query = query.must(QueryBuilders.queryStringQuery(value.toString()));
+                query = query.must(QueryBuilders.queryStringQuery(sanitizeQueryString(value.toString())));
                 break;
             default:
                 query = query.must(QueryBuilders.matchQuery(field, value));

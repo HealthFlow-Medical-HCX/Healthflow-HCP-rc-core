@@ -334,20 +334,14 @@ public class GenericConfiguration implements WebMvcConfigurer {
 		// Do not remove this.
 		registry.addInterceptor(requestIdValidationInterceptor()).addPathPatterns(new ArrayList(requestMap.keySet())).order(orderIdx++);
 
-		// Authenticate and authorization check
-/*		if (authenticationEnabled) {
-			registry.addInterceptor(authorizationInterceptor()).addPathPatterns("/**")
-					.excludePathPatterns("/health", "/error", "/_schemas/**").order(orderIdx++);
-		}*/
-
 		// Validate the input against the defined schema
 		if (validationEnabled) {
 			try {
 				registry.addInterceptor(validationInterceptor()).addPathPatterns("/add").order(orderIdx++);
 			} catch (IOException e) {
-				e.printStackTrace();
+				logger.error("Error configuring interceptor", e);
 			} catch (CustomException e) {
-				e.printStackTrace();
+				logger.error("Error configuring interceptor", e);
 			}
 		}
 	}

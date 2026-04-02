@@ -125,7 +125,7 @@ public class PrivateField {
                     processArray((ArrayNode) entryValue, tempFieldName, entry.getKey());
                 }
             } catch (EncryptionException e) {
-                e.printStackTrace();
+                logger.error("Error processing private fields for {}.{}", tempFieldName, "entry", e);
             }
         }
         return jsonNode;

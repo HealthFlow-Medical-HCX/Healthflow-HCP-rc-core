@@ -60,9 +60,10 @@ public abstract class AbstractController {
     }
 
     ResponseEntity<Object> createUnauthorizedExceptionResponse(Exception e) {
+        logger.warn("Unauthorized access attempt", e);
         ResponseParams responseParams = new ResponseParams();
         Response response = new Response(Response.API_ID.UPDATE, "OK", responseParams);
-        responseParams.setErrmsg(e.getMessage());
+        responseParams.setErrmsg("Unauthorized");
         responseParams.setStatus(Response.Status.UNSUCCESSFUL);
         return new ResponseEntity<>(response, HttpStatus.UNAUTHORIZED);
     }

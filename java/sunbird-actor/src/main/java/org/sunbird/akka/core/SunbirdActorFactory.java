@@ -91,7 +91,9 @@ public class SunbirdActorFactory {
                         actorCache.add(ActorUtils.getName(actorRef), actorRef);
                     } catch (ClassNotFoundException notFound) {
                         // class is not found, looks developer didn't implement
-                        System.out.println(className + " not found.");
+                        ActorCache.instance().print(); // trigger logger
+                        // Class not found - developer may not have implemented this actor
+                        org.slf4j.LoggerFactory.getLogger(SunbirdActorFactory.class).warn("Actor class {} not found", className);
                     }
                 }
             }

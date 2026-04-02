@@ -5,8 +5,8 @@ services:
     image: postgres
     environment:
       - POSTGRES_DB=keycloak
-      - POSTGRES_USER=keycloak
-      - POSTGRES_PASSWORD=keycloak
+      - POSTGRES_USER=${KC_POSTGRES_USER:-keycloak}
+      - POSTGRES_PASSWORD=${KC_POSTGRES_PASSWORD:?KC_POSTGRES_PASSWORD must be set}
   keycloak:
     image: dockerhub/keycloak
 #    build:
@@ -16,10 +16,10 @@ services:
       - DB_ADDR=db
       - DB_PORT=5432
       - DB_DATABASE=keycloak
-      - DB_USER=keycloak
-      - DB_PASSWORD=keycloak
-      - KEYCLOAK_USER=admin
-      - KEYCLOAK_PASSWORD=admin
+      - DB_USER=${KC_POSTGRES_USER:-keycloak}
+      - DB_PASSWORD=${KC_POSTGRES_PASSWORD:?KC_POSTGRES_PASSWORD must be set}
+      - KEYCLOAK_USER=${KEYCLOAK_ADMIN_USER:-admin}
+      - KEYCLOAK_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD must be set}
       - KEYCLOAK_IMPORT=/config/divoc-realm.json
     volumes:
       - .:/config

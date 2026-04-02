@@ -45,7 +45,7 @@ public class SchemaLoader implements ApplicationListener<ContextRefreshedEvent> 
             });
             logger.info("Loaded {} schema from DB", searchResults.get(Schema).size());
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("Error loading schemas from DB", e);
         }
     }
 }

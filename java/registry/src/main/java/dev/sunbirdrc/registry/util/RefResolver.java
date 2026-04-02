@@ -34,7 +34,7 @@ public class RefResolver {
             logger.info(JSONUtil.convertObjectJsonString(resolvedDefinitions));
             return resolvedDefinitions;
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.error("Error resolving schema for definition {}", rootDefinitionName, e);
         }
         return null;
     }

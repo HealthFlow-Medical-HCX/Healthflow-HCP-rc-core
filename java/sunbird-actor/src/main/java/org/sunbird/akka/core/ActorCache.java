@@ -2,19 +2,25 @@ package org.sunbird.akka.core;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Caches the operation and its corresponding ActorRef
  */
 public class ActorCache {
-    // There seems to be no unified way to denote an actorref or actorselection
-    private final static Map<String, ActorRef> routingMap = new HashMap<>();
-    private final static Map<String, ActorSelection> remoteRoutingMap = new HashMap<>();
-    private static ActorCache cacheRef = null;
-    private static Boolean localLock = false;
+    private static final Logger logger = LoggerFactory.getLogger(ActorCache.class);
+
+    private final Map<String, ActorRef> routingMap = new ConcurrentHashMap<>();
+    private final Map<String, ActorSelection> remoteRoutingMap = new ConcurrentHashMap<>();
+
+    /** Holder pattern for thread-safe lazy initialization */
+    private static class Holder {
+        private static final ActorCache INSTANCE = new ActorCache();
+    }
 
     /**
      * Disallow external instantiation
@@ -23,33 +29,21 @@ public class ActorCache {
 
     /**
      * Externally used to get an instance of this class
-     * @return
+     * @return the singleton ActorCache instance
      */
     public static ActorCache instance() {
-        if (!localLock) {
-            synchronized (localLock) {
-                localLock = Boolean.TRUE;
-                if (null == cacheRef) {
-                    cacheRef = new ActorCache();
-                }
-            }
-        }
-        return cacheRef;
+        return Holder.INSTANCE;
     }
 
     /**
      * Add the ActorRef to the cache
-     * @param absName
-     * @param actor
      */
     public void add(String absName, ActorRef actor) {
         routingMap.put(absName, actor);
     }
 
     /**
-     * Add the ActorRef to the cache
-     * @param absName
-     * @param actor
+     * Add the ActorSelection to the cache
      */
     public void add(String absName, ActorSelection actor) {
         remoteRoutingMap.put(absName, actor);
@@ -64,11 +58,7 @@ public class ActorCache {
     }
 
     protected void print() {
-        routingMap.forEach((k,v) -> {
-            System.out.println(k + " -> " + v);
-        });
-        remoteRoutingMap.forEach((k,v) -> {
-            System.out.println(k + " -> " + v);
-        });
+        routingMap.forEach((k, v) -> logger.info("{} -> {}", k, v));
+        remoteRoutingMap.forEach((k, v) -> logger.info("{} -> {}", k, v));
     }
 }

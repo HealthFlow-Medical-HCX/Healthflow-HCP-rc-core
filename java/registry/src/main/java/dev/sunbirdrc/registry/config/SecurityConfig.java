@@ -17,14 +17,13 @@ import org.springframework.security.core.authority.mapping.SimpleAuthorityMapper
 import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.web.authentication.session.RegisterSessionAuthenticationStrategy;
 import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
 @Configuration
 @EnableWebSecurity
 @ComponentScan(basePackageClasses = KeycloakSecurityComponents.class)
-@ConditionalOnProperty(name = "authentication.enabled",havingValue = "true",matchIfMissing = false)
+@ConditionalOnProperty(name = "authentication.enabled",havingValue = "true",matchIfMissing = true)
 public class SecurityConfig extends KeycloakWebSecurityConfigurerAdapter {
-
-    @Value("${authentication.enabled:true}") boolean authenticationEnabled;
 
     @Autowired
     public void configureGlobal(AuthenticationManagerBuilder auth) throws Exception {
@@ -51,20 +50,16 @@ public class SecurityConfig extends KeycloakWebSecurityConfigurerAdapter {
     protected void configure(HttpSecurity http) throws Exception {
         super.configure(http);
 
-        HttpSecurity httpConfig = http.csrf().disable();
-        if (authenticationEnabled) {
-            httpConfig.authorizeRequests()
-                    .antMatchers("/**/invite", "/health", "/error",
-                            "/_schemas/**", "/**/templates/**", "/**/*.json", "/**/verify",
-                            "/swagger-ui", "/**/search", "/**/attestation/**",
-                            "/api/docs/swagger.json","/api/docs/*.json", "/plugin/**")
-                    .permitAll()
-                    .anyRequest()
-                    .authenticated();
-        } else {
-            httpConfig.authorizeRequests()
-                    .anyRequest()
-                    .permitAll();
-        }
+        http.csrf()
+                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .ignoringAntMatchers("/api/v1/**")
+            .and()
+            .authorizeRequests()
+                .antMatchers("/health", "/error",
+                        "/_schemas/**", "/**/templates/**", "/**/verify",
+                        "/swagger-ui", "/api/docs/swagger.json", "/api/docs/*.json")
+                .permitAll()
+                .anyRequest()
+                .authenticated();
     }
 }

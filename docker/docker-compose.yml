@@ -62,8 +62,9 @@ services:
     restart: unless-stopped
     environment:
       - discovery.type=single-node
-      - xpack.security.enabled=false
-      - xpack.security.enrollment.enabled=false
+      - xpack.security.enabled=true
+      - xpack.security.enrollment.enabled=true
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:?ELASTIC_PASSWORD must be set}
       - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
       - cluster.name=healthflow-cluster
       - bootstrap.memory_lock=true
@@ -153,7 +154,7 @@ services:
     volumes:
       - vault_data:/vault/data
       - ./configs/vault-config.hcl:/vault/config/config.hcl:ro
-    command: server -dev
+    command: server
     healthcheck:
       test: ["CMD", "vault", "status"]
       interval: 10s
@@ -327,7 +328,7 @@ services:
       VAULT_TOKEN: ${VAULT_TOKEN}
       VAULT_BASE_PATH: kv/healthflow
       SIGNING_ALGORITHM: Ed25519Signature2020
-      ENABLE_AUTH: "false"
+      ENABLE_AUTH: ${ENABLE_AUTH:-true}
       WEB_DID_BASE_URL: ${DID_BASE_URL:-https://healthflow.eg/did}
     ports:
       - "3332:3332"
@@ -344,7 +345,7 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-healthflow}:${POSTGRES_PASSWORD}@db:5432/credential_schema
       IDENTITY_BASE_URL: http://identity:3332
-      ENABLE_AUTH: "false"
+      ENABLE_AUTH: ${ENABLE_AUTH:-true}
     ports:
       - "3333:3333"
     networks:
@@ -368,7 +369,7 @@ services:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_TOKEN}
       SIGNING_ALGORITHM: Ed25519Signature2020
-      ENABLE_AUTH: "false"
+      ENABLE_AUTH: ${ENABLE_AUTH:-true}
       REVOCATION_LIST_PAGE_SIZE: 10000
     ports:
       - "3000:3000"

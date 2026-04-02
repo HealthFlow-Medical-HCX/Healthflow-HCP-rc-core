@@ -165,7 +165,7 @@ public class SearchDaoImpl implements SearchDao {
 					try {
 						answer = registryDao.getEntity(graph, v, configurator, expandInternal);
 					} catch (Exception e) {
-						e.printStackTrace();
+						org.slf4j.LoggerFactory.getLogger(SearchDaoImpl.class).error("Error getting entity from graph", e);
 					}
 					result.add(answer);
 				}
