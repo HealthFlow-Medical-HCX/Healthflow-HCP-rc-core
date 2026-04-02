@@ -86,7 +86,7 @@ public class RegistryEntityController extends AbstractController {
             watch.start(TAG);
             return new ResponseEntity<>(response, HttpStatus.OK);
         }catch (MiddlewareHaltException | ValidationException | OwnerCreationException e) {
-            return badRequestException(responseParams, response, e.getMessage());
+            return badRequestException(responseParams, response, "Invalid request: validation failed");
         }catch (UnAuthorizedException unAuthorizedException){
             return createUnauthorizedExceptionResponse(unAuthorizedException);
         }catch (Exception e) {
@@ -94,7 +94,7 @@ public class RegistryEntityController extends AbstractController {
                     e.getCause().getCause() instanceof InvocationTargetException) {
                 Throwable targetException = ((InvocationTargetException) (e.getCause().getCause())).getTargetException();
                 if (targetException instanceof OwnerCreationException) {
-                    return badRequestException(responseParams, response, targetException.getMessage());
+                    return badRequestException(responseParams, response, "User creation failed");
                 }
             }
             return internalErrorResponse(responseParams, response, e);

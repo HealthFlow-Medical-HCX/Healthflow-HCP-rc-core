@@ -41,7 +41,7 @@ public class GlobalExceptionHandler {
         logger.warn("Validation error: {}", ex.getMessage());
         ResponseParams responseParams = new ResponseParams();
         responseParams.setStatus(Response.Status.UNSUCCESSFUL);
-        responseParams.setErrmsg(ex.getMessage());
+        responseParams.setErrmsg("Validation failed");
         Response response = new Response(Response.API_ID.CREATE, "ERROR", responseParams);
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }

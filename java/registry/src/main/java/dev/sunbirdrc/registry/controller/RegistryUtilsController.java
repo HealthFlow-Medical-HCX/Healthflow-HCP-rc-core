@@ -275,7 +275,7 @@ public class RegistryUtilsController {
 				logger.error("Exception in controller while searching entities !", e);
 				response.setResult("");
 				responseParams.setStatus(Response.Status.UNSUCCESSFUL);
-				responseParams.setErrmsg(e.getMessage());
+				responseParams.setErrmsg("An error occurred while processing the request");
 			}
 		} else {
 			response.setResult("");

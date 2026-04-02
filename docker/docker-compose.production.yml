@@ -24,7 +24,8 @@ services:
     container_name: healthflow-elasticsearch
     environment:
       - discovery.type=single-node
-      - xpack.security.enabled=false
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:?ELASTIC_PASSWORD must be set}
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     volumes:
       - es_data:/usr/share/elasticsearch/data
@@ -75,16 +76,16 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:22.0
     container_name: healthflow-keycloak
-    command: start-dev
+    command: start --optimized
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD must be set}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://db:5432/keycloak
       KC_DB_USERNAME: ${DB_USER:-healthflow}
       KC_DB_PASSWORD: ${DB_PASSWORD}
-      KC_HOSTNAME_STRICT: "false"
-      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "true"
+      KC_HTTP_ENABLED: "false"
       KC_PROXY: edge
     depends_on:
       db:
@@ -105,7 +106,7 @@ services:
       elastic_search_connection_url: elasticsearch:9200
       elastic_search_enabled: "true"
       search_provider: dev.sunbirdrc.registry.service.ElasticSearchService
-      authentication_enabled: "false"
+      authentication_enabled: "true"
       signature_enabled: "false"
       did_enabled: "false"
       credential_schema_enabled: "false"
@@ -135,10 +136,10 @@ services:
   vault:
     image: hashicorp/vault:1.13.3
     container_name: healthflow-vault
-    command: server -dev
+    command: server
     environment:
-      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:-healthflow-vault-token}
-      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://0.0.0.0:8200
+      VAULT_TOKEN: ${VAULT_TOKEN:?VAULT_TOKEN must be set}
     cap_add:
       - IPC_LOCK
     ports:
@@ -154,7 +155,7 @@ services:
       DATABASE_URL: postgres://${DB_USER:-healthflow}:${DB_PASSWORD}@db:5432/identity
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: ${VAULT_TOKEN:-healthflow-vault-token}
-      ENABLE_AUTH: "false"
+      ENABLE_AUTH: "true"
     depends_on:
       - db
       - vault
@@ -170,7 +171,7 @@ services:
     environment:
       DATABASE_URL: postgres://${DB_USER:-healthflow}:${DB_PASSWORD}@db:5432/credential_schema
       IDENTITY_BASE_URL: http://identity:3332
-      ENABLE_AUTH: "false"
+      ENABLE_AUTH: "true"
     depends_on:
       - db
       - identity
@@ -187,7 +188,7 @@ services:
       DATABASE_URL: postgres://${DB_USER:-healthflow}:${DB_PASSWORD}@db:5432/credentials
       IDENTITY_BASE_URL: http://identity:3332
       SCHEMA_BASE_URL: http://credential-schema:3333
-      ENABLE_AUTH: "false"
+      ENABLE_AUTH: "true"
     depends_on:
       - db
       - identity

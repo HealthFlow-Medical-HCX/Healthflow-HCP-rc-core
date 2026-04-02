@@ -36,7 +36,7 @@ services:
       - sunbird_sso_url=http://kc:8080/auth
       - sunbird_sso_admin_client_id=<%= props.keycloakAdminClientId %>
       - sunbird_sso_client_id=<%= props.keycloakFrontendClientId %>
-      - sunbird_sso_admin_client_secret=INSERT_SECRET_HERE
+      - sunbird_sso_admin_client_secret=${KEYCLOAK_ADMIN_CLIENT_SECRET:?KEYCLOAK_ADMIN_CLIENT_SECRET must be set}
       - claims_url=http://cs:8082
     ports:
       - '8081:8081'

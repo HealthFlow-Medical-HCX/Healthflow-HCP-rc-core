@@ -183,10 +183,10 @@ keycloak:
   realm: ${sunbird_sso_realm:sunbird-rc}
   resource: ${sunbird_sso_client_id:client}
 keycloak-user:
-  default-password: abcd1234
+  default-password: ${sunbird_keycloak_user_password:}
 keycloak-admin:
   client-id: ${sunbird_sso_admin_client_id:admin-api}
-  client-secret: ${sunbird_sso_admin_client_secret:45ee5209-7422-4eb3-98c7-a1b5ea188b16}
+  client-secret: ${sunbird_sso_admin_client_secret:}
 claims:
   url: ${claims_url:http://localhost:8081}
 authentication:

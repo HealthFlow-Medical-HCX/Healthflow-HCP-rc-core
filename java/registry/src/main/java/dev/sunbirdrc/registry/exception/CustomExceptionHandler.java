@@ -24,11 +24,11 @@ public class CustomExceptionHandler extends BaseResponseHandler implements Handl
 	public ModelAndView resolveException(HttpServletRequest request, HttpServletResponse response, Object handler,
 			Exception ex) {
 		try {
-			logger.info("Exception thrown-" + ex.getMessage());
+			logger.error("Exception in request handling", ex);
 			setResponse(response);
-			writeResponseObj(gson, ex.getMessage());
+			writeResponseObj(gson, "An error occurred while processing the request");
 		} catch (Exception e) {
-			logger.error("Error in sending response");
+			logger.error("Error in sending response", e);
 		}
 		return null;
 	}
