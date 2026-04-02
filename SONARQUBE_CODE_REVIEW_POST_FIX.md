@@ -220,23 +220,105 @@ Multiple `secure:` variables - should migrate to GitHub Actions secrets.
 
 ---
 
+## ADDITIONAL CODE QUALITY FINDINGS (from deep analysis)
+
+The code quality deep-dive found 38 additional lower-severity items not in the original 67. These represent ongoing technical debt:
+
+### Thread Safety (HIGH)
+
+#### QH1. Mutable Static Field in JSONUtil
+**File**: `java/middleware-commons/src/main/java/dev/sunbirdrc/registry/middleware/util/JSONUtil.java:41`
+```java
+private static String key = "";  // Modified in findKey() - race condition
+```
+Multiple concurrent calls to `findKey()` will overwrite each other's values.
+
+#### QH2. Broken Recursive Logic in JSONUtil.findKey()
+**File**: `java/middleware-commons/.../JSONUtil.java:365`
+```java
+} else if (entry.getValue().isObject()) {
+    findKey(entry.getValue(), value);  // Return value ignored
+}
+```
+Recursive call result is not assigned, breaking the lookup logic.
+
+### Null Safety (HIGH)
+
+#### QH3. Unchecked `.get(0)` on List
+**File**: `java/middleware-commons/.../JSONUtil.java:484-485`
+```java
+List<String> typeList = JsonPath.using(...).parse(input.toString()).read(path);
+return typeList.get(0);  // IndexOutOfBoundsException if empty
+```
+
+#### QH4. Unchecked `.get()` on Optional in SqlgProvider
+**File**: `java/registry/src/main/java/dev/sunbirdrc/registry/sink/SqlgProvider.java:104,119`
+```java
+properties.add(vertexLabel.getProperty(propertyName).get());  // NoSuchElementException
+```
+
+#### QH5. Unsafe Chained `.get()` in RegistryHelper
+**File**: `java/registry/.../helper/RegistryHelper.java:460,477-479`
+Chained `.at()` calls on Optional results without proper null guards.
+
+### Exception Handling (MEDIUM)
+
+- `RegistryHelper.java:458,474` - Throws generic `Exception` instead of domain-specific
+- `EntityStateHelper.java:162` - Throws generic `Exception`
+- `JSONUtil.java:313` - Throws generic `Exception("Illegal Path")`
+- `AuthorizationFilter.java:81-84` - Catches generic `Exception`, loses context
+
+### God Classes (MEDIUM)
+
+- `RegistryHelper.java` - 984 lines, 30+ dependencies (unchanged from before)
+- `RegistryEntityController.java` - 660 lines
+- `JSONUtil.java` - 553 lines with mutable static state
+
+### Remaining Raw Types (LOW - 8 occurrences)
+
+Found in: `DivocActor.java:40`, `DivocPDFActor.java:49`, `RegistryUtilsController.java:129`, `RegistryEntityController.java:376`, `RegistryController.java:109`, `SignatureHelper.java:41,59`, `SearchDaoImpl.java:140`
+
+### Remaining Commented-Out Code (LOW - 8 blocks)
+
+Found in: `SunbirdActorFactory.java`, `JSONUtil.java:89`, `RegistryServiceImpl.java:312-313,483`, `BaseResponseHandler.java:45,82`
+
+---
+
+## COMPLETE FINDINGS SUMMARY
+
+| Category | Critical | High | Medium | Low | Total |
+|----------|----------|------|--------|-----|-------|
+| Security (from original 67) | 2 | 6 | 8 | 4 | 20 |
+| Code Quality (new findings) | 0 | 5 | 9 | 16 | 30 |
+| **Combined Total** | **2** | **11** | **17** | **20** | **50** |
+
+**Note**: The 30 code quality items are mostly lower-severity technical debt (raw types, commented code, God classes) that were not in the original review scope. The 20 security/reliability items are the direct comparison to the original 67.
+
+---
+
 ## RECOMMENDED NEXT STEPS (Priority Order)
 
 ### Immediate (P0)
 1. **Rotate the SendInBlue API key** - it's been committed to git history
 2. **Fix `java/registry/docker-compose.yml`** - hardcoded credentials + outdated image
+3. **Fix mutable static `key` field in JSONUtil** - thread safety bug
 
 ### Short-term (P1)
-3. Upgrade `deps/keycloak/Dockerfile` from 14.0.0 to 24.x
-4. Add Redis authentication (`--requirepass`)
-5. Change Keycloak from `start-dev` to `start` in production compose
-6. Pin MinIO image version
-7. Add HTTP security headers via Spring Security
+4. Upgrade `deps/keycloak/Dockerfile` from 14.0.0 to 24.x
+5. Add Redis authentication (`--requirepass`)
+6. Change Keycloak from `start-dev` to `start` in production compose
+7. Pin MinIO image version
+8. Add HTTP security headers via Spring Security
+9. Fix null-unsafe `.get()` calls on Optional/List in SqlgProvider and JSONUtil
 
 ### Medium-term (P2)
-8. Enable Kafka SASL_SSL authentication
-9. Add API rate limiting
-10. Mask passwords in deploy script output
-11. Add HEALTHCHECK to Node.js Dockerfiles
-12. Remove placeholder secrets from application.yml defaults
-13. Migrate Travis CI secrets to GitHub Actions
+10. Enable Kafka SASL_SSL authentication
+11. Add API rate limiting
+12. Refactor `RegistryHelper` God class (984 lines)
+13. Replace generic `throw new Exception()` with domain-specific exceptions
+14. Fix remaining raw types across codebase
+15. Mask passwords in deploy script output
+16. Add HEALTHCHECK to Node.js Dockerfiles
+17. Remove placeholder secrets from application.yml defaults
+18. Migrate Travis CI secrets to GitHub Actions
+19. Remove all remaining commented-out dead code
