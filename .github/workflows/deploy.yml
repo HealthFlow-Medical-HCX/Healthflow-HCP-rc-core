@@ -111,12 +111,21 @@ jobs:
       - name: Set up SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          printf '%s\n' "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "$DROPLET_IP" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-          # Give cloud-init a few extra seconds on fresh boot
-          sleep 20
+          # Wait for SSH to be ready (retry up to 20 times, 15s apart = 5 min max)
+          echo "Waiting for SSH on $DROPLET_IP..."
+          for i in $(seq 1 20); do
+            if ssh-keyscan -H "$DROPLET_IP" >> ~/.ssh/known_hosts 2>/dev/null; then
+              echo "SSH is ready after attempt $i"
+              break
+            fi
+            echo "Attempt $i: SSH not ready yet, waiting 15s..."
+            sleep 15
+          done
+          # Extra buffer for cloud-init to finish
+          sleep 30
 
       - name: Bootstrap droplet (Docker, git, deps)
         run: |
@@ -164,17 +173,20 @@ jobs:
 
       - name: Clone repo and start services
         run: |
-          ssh root@"$DROPLET_IP" bash <<'DEPLOY'
+          GH_PAT="${{ secrets.GITHUB_TOKEN }}"
+          ssh root@"$DROPLET_IP" bash -s << DEPLOY
             set -euo pipefail
             APP_DIR=/opt/healthflow-rc
 
-            if [ -d "$APP_DIR" ]; then
-              cd "$APP_DIR" && git pull origin main
+            if [ -d "\$APP_DIR" ]; then
+              cd "\$APP_DIR"
+              git remote set-url origin https://x-access-token:$GH_PAT@github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core.git
+              git pull origin main
             else
-              git clone https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core.git "$APP_DIR"
+              git clone https://x-access-token:$GH_PAT@github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core.git "\$APP_DIR"
             fi
 
-            cd "$APP_DIR"
+            cd "\$APP_DIR"
             cp /root/healthflow-rc.env .env
 
             echo "==> Pulling images"
