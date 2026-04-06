@@ -1,8 +1,6 @@
 name: Deploy HealthFlow RC to DigitalOcean
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       droplet_size:
@@ -132,6 +130,19 @@ jobs:
           ssh -o StrictHostKeyChecking=no root@"$DROPLET_IP" bash <<'BOOTSTRAP'
             set -euo pipefail
             export DEBIAN_FRONTEND=noninteractive
+
+            echo "==> Waiting for cloud-init to complete..."
+            cloud-init status --wait || true
+
+            echo "==> Stopping unattended-upgrades..."
+            systemctl stop unattended-upgrades.service || true
+            killall unattended-upgrade apt apt-get 2>/dev/null || true
+
+            echo "==> Waiting for apt locks to clear..."
+            while fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/lib/dpkg/lock >/dev/null 2>&1; do
+              echo "  apt is locked, retrying in 5s..."
+              sleep 5
+            done
 
             echo "==> Updating packages"
             apt-get update -qq && apt-get upgrade -y -qq
