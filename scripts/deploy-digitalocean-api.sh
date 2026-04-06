@@ -5,7 +5,7 @@
 # Creates and provisions a droplet using the DO API (no Terraform needed)
 # =============================================================================
 # Usage:
-#   export DO_API_TOKEN="your_token_here"
+#   export DO_API_TOKEN="dop_v1_71bcc96af4bd4a1b93411420ff8e553192ae7dd06ddd5a66fc84d4ddbdb7a63e"
 #   ./deploy-digitalocean-api.sh [create|destroy|status|ssh]
 # =============================================================================
 
