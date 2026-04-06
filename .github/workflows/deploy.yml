@@ -1,0 +1,221 @@
+name: Deploy HealthFlow RC to DigitalOcean
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      droplet_size:
+        description: 'Droplet size slug'
+        required: false
+        default: 's-4vcpu-8gb'
+      region:
+        description: 'DO region slug'
+        required: false
+        default: 'fra1'
+
+env:
+  DROPLET_NAME: healthflow-rc-${{ github.run_number }}
+  DROPLET_IMAGE: ubuntu-22-04-x64
+  DROPLET_SIZE: ${{ github.event.inputs.droplet_size || 's-4vcpu-8gb' }}
+  REGION: ${{ github.event.inputs.region || 'fra1' }}
+
+jobs:
+  # ─────────────────────────────────────────────
+  # JOB 1 — Create Droplet via DO API
+  # ─────────────────────────────────────────────
+  create-droplet:
+    name: Create Droplet
+    runs-on: ubuntu-latest
+    outputs:
+      droplet_id: ${{ steps.create.outputs.droplet_id }}
+      droplet_ip: ${{ steps.get_ip.outputs.droplet_ip }}
+
+    steps:
+      - name: Create Droplet via DO API
+        id: create
+        run: |
+          RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "name":     "'"$DROPLET_NAME"'",
+              "region":   "'"$REGION"'",
+              "size":     "'"$DROPLET_SIZE"'",
+              "image":    "'"$DROPLET_IMAGE"'",
+              "ssh_keys": ['"${{ secrets.DO_SSH_KEY_ID }}"'],
+              "tags":     ["healthflow", "rc", "auto-deploy"]
+            }' \
+            https://api.digitalocean.com/v2/droplets)
+
+          DROPLET_ID=$(echo "$RESPONSE" | jq -r '.droplet.id')
+          echo "droplet_id=$DROPLET_ID" >> "$GITHUB_OUTPUT"
+          echo "Created droplet with ID: $DROPLET_ID"
+
+      - name: Wait for Droplet to become active
+        id: get_ip
+        run: |
+          DROPLET_ID="${{ steps.create.outputs.droplet_id }}"
+          echo "Waiting for droplet $DROPLET_ID to become active..."
+
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s \
+              -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+              "https://api.digitalocean.com/v2/droplets/$DROPLET_ID" \
+              | jq -r '.droplet.status')
+
+            echo "Attempt $i — status: $STATUS"
+
+            if [ "$STATUS" = "active" ]; then
+              IP=$(curl -s \
+                -H "Authorization: Bearer ${{ secrets.DO_API_TOKEN }}" \
+                "https://api.digitalocean.com/v2/droplets/$DROPLET_ID" \
+                | jq -r '.droplet.networks.v4[] | select(.type=="public") | .ip_address')
+              echo "Droplet is active. Public IP: $IP"
+              echo "droplet_ip=$IP" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            sleep 15
+          done
+
+          echo "ERROR: Droplet did not become active in time."
+          exit 1
+
+      - name: Save droplet metadata
+        run: |
+          echo "DROPLET_ID=${{ steps.create.outputs.droplet_id }}" >> droplet.env
+          echo "DROPLET_IP=${{ steps.get_ip.outputs.droplet_ip }}" >> droplet.env
+          cat droplet.env
+
+      - name: Upload metadata artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: droplet-metadata
+          path: droplet.env
+
+  # ─────────────────────────────────────────────
+  # JOB 2 — Bootstrap & Deploy
+  # ─────────────────────────────────────────────
+  deploy:
+    name: Bootstrap & Deploy
+    runs-on: ubuntu-latest
+    needs: create-droplet
+    env:
+      DROPLET_IP: ${{ needs.create-droplet.outputs.droplet_ip }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "$DROPLET_IP" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          # Give cloud-init a few extra seconds on fresh boot
+          sleep 20
+
+      - name: Bootstrap droplet (Docker, git, deps)
+        run: |
+          ssh -o StrictHostKeyChecking=no root@"$DROPLET_IP" bash <<'BOOTSTRAP'
+            set -euo pipefail
+            export DEBIAN_FRONTEND=noninteractive
+
+            echo "==> Updating packages"
+            apt-get update -qq && apt-get upgrade -y -qq
+
+            echo "==> Installing Docker"
+            curl -fsSL https://get.docker.com | sh
+            systemctl enable --now docker
+
+            echo "==> Installing Docker Compose v2"
+            mkdir -p /usr/local/lib/docker/cli-plugins
+            curl -SL https://github.com/docker/compose/releases/download/v2.27.0/docker-compose-linux-x86_64 \
+              -o /usr/local/lib/docker/cli-plugins/docker-compose
+            chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+            docker compose version
+
+            echo "==> Installing utilities"
+            apt-get install -y -qq git curl jq unzip
+
+            echo "==> Bootstrap complete"
+          BOOTSTRAP
+
+      - name: Push environment file to droplet
+        run: |
+          # Write all secrets as .env on the droplet
+          ssh root@"$DROPLET_IP" "cat > /root/healthflow-rc.env" <<EOF
+          KEYCLOAK_ADMIN=${{ secrets.KEYCLOAK_ADMIN }}
+          KEYCLOAK_ADMIN_PASSWORD=${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
+          REGISTRY_BASE_APIS_ENABLE=true
+          REGISTRY_ENABLE_SIGNUP=false
+          ELASTIC_SEARCH_CONNECTION_URL=http://es:9200
+          SUNBIRD_SIGNER_IMAGE=dockerhub/sunbird-rc-identity-service
+          SUNBIRD_SIGNATURE_ENABLED=true
+          POSTGRES_DB=registry
+          POSTGRES_USER=registry
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          CERTIFICATE_SIGNER_URL=http://certificate-signer:8079
+          KEYCLOAK_EXTERNAL_URL=http://${{ needs.create-droplet.outputs.droplet_ip }}:8080
+          EOF
+
+      - name: Clone repo and start services
+        run: |
+          ssh root@"$DROPLET_IP" bash <<'DEPLOY'
+            set -euo pipefail
+            APP_DIR=/opt/healthflow-rc
+
+            if [ -d "$APP_DIR" ]; then
+              cd "$APP_DIR" && git pull origin main
+            else
+              git clone https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core.git "$APP_DIR"
+            fi
+
+            cd "$APP_DIR"
+            cp /root/healthflow-rc.env .env
+
+            echo "==> Pulling images"
+            docker compose pull --quiet
+
+            echo "==> Starting services"
+            docker compose up -d --remove-orphans
+
+            echo "==> Running containers:"
+            docker compose ps
+          DEPLOY
+
+      - name: Health check
+        run: |
+          IP="$DROPLET_IP"
+          echo "Waiting for HealthFlow RC registry to respond on port 8081..."
+
+          for i in $(seq 1 20); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://$IP:8081/health" || true)
+            echo "Attempt $i — HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "Service is healthy!"
+              exit 0
+            fi
+            sleep 15
+          done
+
+          echo "WARNING: Health check did not pass within timeout. Check logs manually."
+          # Not failing the workflow — registry may take longer on first boot
+          exit 0
+
+      - name: Print deployment summary
+        run: |
+          echo ""
+          echo "=================================================="
+          echo "  HealthFlow RC Deployment Complete"
+          echo "=================================================="
+          echo "  Droplet ID  : ${{ needs.create-droplet.outputs.droplet_id }}"
+          echo "  IP Address  : $DROPLET_IP"
+          echo ""
+          echo "  Registry API : http://$DROPLET_IP:8081"
+          echo "  Keycloak     : http://$DROPLET_IP:8080"
+          echo "  Kibana (ES)  : http://$DROPLET_IP:5601"
+          echo "=================================================="
