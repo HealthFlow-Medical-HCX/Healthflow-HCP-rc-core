@@ -1,15 +1,16 @@
 -- HealthFlow Sunbird RC - Database Initialization Script
 -- Creates required databases and extensions for all services
 
--- Create databases for each service
-CREATE DATABASE IF NOT EXISTS registry;
-CREATE DATABASE IF NOT EXISTS keycloak;
-CREATE DATABASE IF NOT EXISTS identity;
-CREATE DATABASE IF NOT EXISTS credential_schema;
-CREATE DATABASE IF NOT EXISTS credentials;
-CREATE DATABASE IF NOT EXISTS claims;
-CREATE DATABASE IF NOT EXISTS idgen;
-CREATE DATABASE IF NOT EXISTS bulk_issuance;
+-- Create databases for each service.
+-- PostgreSQL has no "CREATE DATABASE IF NOT EXISTS"; emulate it with \gexec.
+-- "registry" is already created by the POSTGRES_DB env var, so it is skipped.
+SELECT 'CREATE DATABASE keycloak'          WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'keycloak')\gexec
+SELECT 'CREATE DATABASE identity'          WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'identity')\gexec
+SELECT 'CREATE DATABASE credential_schema' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'credential_schema')\gexec
+SELECT 'CREATE DATABASE credentials'       WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'credentials')\gexec
+SELECT 'CREATE DATABASE claims'            WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'claims')\gexec
+SELECT 'CREATE DATABASE idgen'             WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'idgen')\gexec
+SELECT 'CREATE DATABASE bulk_issuance'     WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'bulk_issuance')\gexec
 
 -- Grant privileges to healthflow user
 GRANT ALL PRIVILEGES ON DATABASE registry TO healthflow;
