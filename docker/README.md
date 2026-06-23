@@ -54,8 +54,8 @@ This deployment package provides a complete, production-ready setup for HealthFl
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/HealthFlow-Medical-HCX/Healthflow-sunbird-rc-core.git
-cd Healthflow-sunbird-rc-core/docker
+git clone https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core.git
+cd Healthflow-HCP-rc-core/docker
 ```
 
 ### 2. Configure Environment
@@ -311,7 +311,7 @@ curl http://localhost:3000/health
 ## Support
 
 - **Documentation**: [Sunbird RC Docs](https://docs.sunbirdrc.dev/)
-- **Issues**: [GitHub Issues](https://github.com/HealthFlow-Medical-HCX/Healthflow-sunbird-rc-core/issues)
+- **Issues**: [GitHub Issues](https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core/issues)
 - **Email**: support@healthflow.eg
 
 ## License

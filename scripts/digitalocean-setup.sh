@@ -144,12 +144,12 @@ chown -R healthflow:healthflow /opt/healthflow
 # Clone repository
 log_info "Cloning repository..."
 cd /opt/healthflow
-if [ -d "Healthflow-sunbird-rc-core" ]; then
-    cd Healthflow-sunbird-rc-core
+if [ -d "Healthflow-HCP-rc-core" ]; then
+    cd Healthflow-HCP-rc-core
     git pull origin main
 else
-    git clone https://github.com/HealthFlow-Medical-HCX/Healthflow-sunbird-rc-core.git
-    cd Healthflow-sunbird-rc-core
+    git clone https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core.git
+    cd Healthflow-HCP-rc-core
 fi
 
 # Copy docker configuration
@@ -202,12 +202,12 @@ fi
 # Create backup cron job
 log_info "Setting up backup cron job..."
 cat > /etc/cron.d/healthflow-backup << 'EOF'
-0 2 * * * healthflow /opt/healthflow/Healthflow-sunbird-rc-core/scripts/deploy.sh production backup >> /var/log/healthflow-backup.log 2>&1
+0 2 * * * healthflow /opt/healthflow/Healthflow-HCP-rc-core/scripts/deploy.sh production backup >> /var/log/healthflow-backup.log 2>&1
 EOF
 
 # Set permissions
 chown -R healthflow:healthflow /opt/healthflow
-chmod +x /opt/healthflow/Healthflow-sunbird-rc-core/scripts/*.sh
+chmod +x /opt/healthflow/Healthflow-HCP-rc-core/scripts/*.sh
 
 # Print summary
 echo ""

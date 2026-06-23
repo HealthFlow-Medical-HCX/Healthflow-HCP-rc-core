@@ -81,12 +81,12 @@ write_files:
       
       # Clone or update repository
       cd /opt/healthflow
-      if [ -d "Healthflow-sunbird-rc-core" ]; then
-        cd Healthflow-sunbird-rc-core
+      if [ -d "Healthflow-HCP-rc-core" ]; then
+        cd Healthflow-HCP-rc-core
         git pull origin main
       else
-        git clone https://github.com/HealthFlow-Medical-HCX/Healthflow-sunbird-rc-core.git
-        cd Healthflow-sunbird-rc-core
+        git clone https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core.git
+        cd Healthflow-HCP-rc-core
       fi
       
       # Copy environment file if not exists
@@ -209,7 +209,7 @@ runcmd:
   # Clone repository
   - |
     cd /opt/healthflow
-    git clone https://github.com/HealthFlow-Medical-HCX/Healthflow-sunbird-rc-core.git || true
+    git clone https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core.git || true
   
   # Set permissions
   - chown -R healthflow:healthflow /opt/healthflow
@@ -219,7 +219,7 @@ final_message: |
   
   Next steps:
   1. SSH into the server: ssh healthflow@<IP_ADDRESS>
-  2. Navigate to: cd /opt/healthflow/Healthflow-sunbird-rc-core
+  2. Navigate to: cd /opt/healthflow/Healthflow-HCP-rc-core
   3. Configure environment: cp .env.example .env && nano .env
   4. Deploy services: ./scripts/deploy.sh
   

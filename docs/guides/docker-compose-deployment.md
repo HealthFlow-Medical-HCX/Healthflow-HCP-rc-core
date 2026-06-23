@@ -26,8 +26,8 @@ This guide provides instructions for deploying HealthFlow RC on a single server 
 Clone the HealthFlow RC repository from GitHub:
 
 ```bash
-git clone https://github.com/HealthFlow-Medical-HCX/Healthflow-sunbird-rc-core.git
-cd Healthflow-sunbird-rc-core
+git clone https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core.git
+cd Healthflow-HCP-rc-core
 ```
 
 ### 2. Configure Environment Variables

@@ -121,8 +121,8 @@ This documentation is organized into the following sections:
 
 For technical support and questions about HealthFlow RC:
 
-- **Documentation:** https://github.com/HealthFlow-Medical-HCX/Healthflow-sunbird-rc-core/docs
-- **Issues:** https://github.com/HealthFlow-Medical-HCX/Healthflow-sunbird-rc-core/issues
+- **Documentation:** https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core/docs
+- **Issues:** https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core/issues
 - **Email:** support@healthflow.tech
 
 ---

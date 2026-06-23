@@ -3,7 +3,7 @@
 **Version:** 2.0  
 **Last Updated:** December 2025
 
-[![Build Status](https://github.com/HealthFlow-Medical-HCX/Healthflow-sunbird-rc-core/actions/workflows/maven.yml/badge.svg)](https://github.com/HealthFlow-Medical-HCX/Healthflow-sunbird-rc-core/actions/workflows/maven.yml)
+[![Build Status](https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core/actions/workflows/maven.yml/badge.svg)](https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core/actions/workflows/maven.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
@@ -57,8 +57,8 @@ To deploy HealthFlow RC, follow the instructions in the [Docker Compose Deployme
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/HealthFlow-Medical-HCX/Healthflow-sunbird-rc-core.git
-   cd Healthflow-sunbird-rc-core
+   git clone https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core.git
+   cd Healthflow-HCP-rc-core
    ```
 
 2. **Configure environment variables:**
@@ -96,8 +96,8 @@ We welcome contributions to the HealthFlow RC platform. Please refer to the [Con
 
 For technical support and questions about HealthFlow RC:
 
-- **Documentation:** [https://github.com/HealthFlow-Medical-HCX/Healthflow-sunbird-rc-core/tree/main/docs](https://github.com/HealthFlow-Medical-HCX/Healthflow-sunbird-rc-core/tree/main/docs)
-- **Issues:** [https://github.com/HealthFlow-Medical-HCX/Healthflow-sunbird-rc-core/issues](https://github.com/HealthFlow-Medical-HCX/Healthflow-sunbird-rc-core/issues)
+- **Documentation:** [https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core/tree/main/docs](https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core/tree/main/docs)
+- **Issues:** [https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core/issues](https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core/issues)
 - **Email:** support@healthflow.tech
 
 ---
