@@ -92,9 +92,14 @@ resource "digitalocean_droplet" "sunbird_rc" {
   monitoring = true
   backups    = true
 
-  # User data script for initial setup
+  # User data script for initial setup.
+  # The compose file, DB init script and provisioning script are baked in as
+  # base64 so the droplet never needs to clone this (private) repository.
   user_data = templatefile("${path.module}/cloud-init.yaml", {
-    environment = var.environment
+    environment   = var.environment
+    compose_b64   = base64encode(file("${path.module}/../docker/docker-compose.production.yml"))
+    initdb_b64    = base64encode(file("${path.module}/../docker/scripts/init-db.sql"))
+    provision_b64 = base64encode(file("${path.module}/../scripts/provision-droplet.sh"))
   })
 
   lifecycle {

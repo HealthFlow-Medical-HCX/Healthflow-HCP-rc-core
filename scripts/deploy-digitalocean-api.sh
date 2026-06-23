@@ -94,138 +94,49 @@ check_token() {
 }
 
 # --- Cloud-init user data ----------------------------------------------------
+# Builds a self-contained #cloud-config. Rather than cloning this (private)
+# repository on the droplet, it bakes the runtime files in directly:
+#   - docker/docker-compose.production.yml
+#   - docker/scripts/init-db.sql
+#   - scripts/provision-droplet.sh
+# All container images are pulled from public registries, so the droplet needs
+# no GitHub access at all.
 generate_userdata() {
-    cat << 'CLOUD_INIT_EOF'
-#!/bin/bash
-set -e
+    local root compose_b64 initdb_b64 provision_b64
+    root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-export DEBIAN_FRONTEND=noninteractive
+    local compose_file="$root/docker/docker-compose.production.yml"
+    local initdb_file="$root/docker/scripts/init-db.sql"
+    local provision_file="$root/scripts/provision-droplet.sh"
 
-# Update system
-apt-get update && apt-get upgrade -y
+    for f in "$compose_file" "$initdb_file" "$provision_file"; do
+        if [ ! -f "$f" ]; then
+            log_error "Required file not found: $f" >&2
+            exit 1
+        fi
+    done
 
-# Install prerequisites
-apt-get install -y \
-    apt-transport-https ca-certificates curl gnupg lsb-release \
-    git htop vim ufw fail2ban unzip jq nginx certbot python3-certbot-nginx
+    # base64 without newlines (portable across GNU/BSD base64)
+    compose_b64=$(base64 < "$compose_file" | tr -d '\n')
+    initdb_b64=$(base64 < "$initdb_file" | tr -d '\n')
+    provision_b64=$(base64 < "$provision_file" | tr -d '\n')
 
-# Install Docker
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
-    | tee /etc/apt/sources.list.d/docker.list > /dev/null
-apt-get update
-apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
-systemctl start docker
-systemctl enable docker
-
-# Docker logging config
-cat > /etc/docker/daemon.json << 'DOCKEREOF'
-{
-  "log-driver": "json-file",
-  "log-opts": { "max-size": "100m", "max-file": "3" },
-  "storage-driver": "overlay2"
-}
-DOCKEREOF
-systemctl restart docker
-
-# Create healthflow user
-useradd -m -s /bin/bash healthflow || true
-usermod -aG docker healthflow
-usermod -aG sudo healthflow
-
-# System tuning for Elasticsearch
-cat > /etc/sysctl.d/99-elasticsearch.conf << 'SYSEOF'
-vm.max_map_count=262144
-vm.swappiness=1
-net.core.somaxconn=65535
-SYSEOF
-sysctl -p /etc/sysctl.d/99-elasticsearch.conf
-
-# Firewall
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow ssh
-ufw allow http
-ufw allow https
-ufw allow 8080/tcp
-ufw allow 8081/tcp
-ufw --force enable
-
-# Fail2ban
-cat > /etc/fail2ban/jail.local << 'F2BEOF'
-[DEFAULT]
-bantime = 3600
-findtime = 600
-maxretry = 5
-
-[sshd]
-enabled = true
-port = ssh
-filter = sshd
-logpath = /var/log/auth.log
-maxretry = 3
-F2BEOF
-systemctl enable fail2ban
-systemctl restart fail2ban
-
-# Setup deployment directory
-mkdir -p /opt/healthflow/backups
-cd /opt/healthflow
-
-# Clone repository
-git clone https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core.git 2>/dev/null || true
-cd Healthflow-HCP-rc-core
-
-# Create .env from example with auto-generated secure passwords
-cd docker
-if [ -f .env.example ] && [ ! -f .env ]; then
-    cp .env.example .env
-    PG_PASS=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 24)
-    KC_PASS=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 24)
-    VT_TOKEN=$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 32)
-    ENC_KEY=$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 32)
-    MINIO_KEY=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 24)
-    CH_PASS=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 24)
-    JWT_SEC=$(openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 32)
-
-    sed -i "s/CHANGE_ME_secure_postgres_password_2024/$PG_PASS/g" .env
-    sed -i "s/CHANGE_ME_secure_keycloak_password/$KC_PASS/g" .env
-    sed -i "s/CHANGE_ME_vault_root_token/$VT_TOKEN/g" .env
-    sed -i "s/CHANGE_ME_32_character_key_here!/$ENC_KEY/g" .env
-    sed -i "s/CHANGE_ME_minio_secret_key_2024/$MINIO_KEY/g" .env
-    sed -i "s/CHANGE_ME_clickhouse_password/$CH_PASS/g" .env
-    sed -i "s/CHANGE_ME_jwt_secret_minimum_32_characters/$JWT_SEC/g" .env
-    sed -i "s/CHANGE_ME_bulk_issuance_secret/$(openssl rand -hex 16)/g" .env
-    sed -i "s/CHANGE_ME_generate_uuid/$(cat /proc/sys/kernel/random/uuid)/g" .env
-
-    # Save credentials for the admin
-    cat > /opt/healthflow/credentials.txt << CREDEOF
-=== HealthFlow Generated Credentials ===
-Date: $(date -u)
-PostgreSQL Password: $PG_PASS
-Keycloak Admin Password: $KC_PASS
-Vault Token: $VT_TOKEN
-Encryption Key: $ENC_KEY
-MinIO Secret Key: $MINIO_KEY
-ClickHouse Password: $CH_PASS
-JWT Secret: $JWT_SEC
-CREDEOF
-    chmod 600 /opt/healthflow/credentials.txt
-fi
-
-# Start services with docker compose
-docker compose -f docker-compose.production.yml up -d
-
-# Set ownership
-chown -R healthflow:healthflow /opt/healthflow
-
-# Setup daily backup cron
-echo "0 2 * * * root cd /opt/healthflow/Healthflow-HCP-rc-core && docker exec healthflow-db pg_dumpall -U healthflow > /opt/healthflow/backups/postgres_\$(date +\%Y\%m\%d).sql 2>/dev/null" \
-    > /etc/cron.d/healthflow-backup
-
-echo "=== HealthFlow provisioning complete ==="
-CLOUD_INIT_EOF
+    cat <<CLOUD_CFG
+#cloud-config
+write_files:
+  - path: /opt/healthflow/docker/docker-compose.production.yml
+    encoding: b64
+    content: ${compose_b64}
+  - path: /opt/healthflow/docker/scripts/init-db.sql
+    encoding: b64
+    content: ${initdb_b64}
+  - path: /opt/healthflow/provision-droplet.sh
+    encoding: b64
+    permissions: '0755'
+    content: ${provision_b64}
+runcmd:
+  - [ bash, /opt/healthflow/provision-droplet.sh ]
+CLOUD_CFG
 }
 
 # --- Get SSH key ID -----------------------------------------------------------

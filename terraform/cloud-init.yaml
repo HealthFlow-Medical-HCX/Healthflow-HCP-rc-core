@@ -1,226 +1,31 @@
 #cloud-config
 # =============================================================================
-# HealthFlow Sunbird RC v2 - Cloud Init Configuration
-# Automated server setup for Digital Ocean droplet
+# HealthFlow HCP Registry - Cloud-Init (Terraform)
+# =============================================================================
+# Self-contained: the runtime files are injected as base64 by Terraform
+# (see main.tf -> templatefile vars), so the droplet never clones this
+# private repository. All container images come from public registries.
 # =============================================================================
 
-package_update: true
-package_upgrade: true
-
-packages:
-  - apt-transport-https
-  - ca-certificates
-  - curl
-  - gnupg
-  - lsb-release
-  - git
-  - htop
-  - vim
-  - ufw
-  - fail2ban
-  - unzip
-  - jq
-  - nginx
-  - certbot
-  - python3-certbot-nginx
-
-# Create healthflow user
-users:
-  - name: healthflow
-    groups: sudo, docker
-    shell: /bin/bash
-    sudo: ['ALL=(ALL) NOPASSWD:ALL']
-    ssh_authorized_keys:
-      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPuQa2lqkkwaCIDwjspK3IO2aVeMTBO2Ox4zTV9d69IL surface@DESKTOP-M4S4J3H
-
 write_files:
-  # Docker daemon configuration
-  - path: /etc/docker/daemon.json
-    content: |
-      {
-        "log-driver": "json-file",
-        "log-opts": {
-          "max-size": "100m",
-          "max-file": "3"
-        },
-        "storage-driver": "overlay2"
-      }
-    permissions: '0644'
+  - path: /opt/healthflow/docker/docker-compose.production.yml
+    encoding: b64
+    content: ${compose_b64}
 
-  # Fail2ban configuration
-  - path: /etc/fail2ban/jail.local
-    content: |
-      [DEFAULT]
-      bantime = 3600
-      findtime = 600
-      maxretry = 5
-      
-      [sshd]
-      enabled = true
-      port = ssh
-      filter = sshd
-      logpath = /var/log/auth.log
-      maxretry = 3
-    permissions: '0644'
+  - path: /opt/healthflow/docker/scripts/init-db.sql
+    encoding: b64
+    content: ${initdb_b64}
 
-  # System limits for Elasticsearch
-  - path: /etc/sysctl.d/99-elasticsearch.conf
-    content: |
-      vm.max_map_count=262144
-      vm.swappiness=1
-      net.core.somaxconn=65535
-    permissions: '0644'
-
-  # Healthflow deployment script
-  - path: /opt/healthflow/deploy.sh
-    content: |
-      #!/bin/bash
-      set -e
-      
-      echo "=== HealthFlow Sunbird RC Deployment ==="
-      
-      # Clone or update repository
-      cd /opt/healthflow
-      if [ -d "Healthflow-HCP-rc-core" ]; then
-        cd Healthflow-HCP-rc-core
-        git pull origin main
-      else
-        git clone https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core.git
-        cd Healthflow-HCP-rc-core
-      fi
-      
-      # Copy environment file if not exists
-      if [ ! -f .env ]; then
-        cp .env.example .env
-        echo "Please configure .env file before starting services"
-        exit 1
-      fi
-      
-      # Start services
-      docker compose -f docker/docker-compose.yml up -d
-      
-      echo "=== Deployment Complete ==="
-      docker compose -f docker/docker-compose.yml ps
+  - path: /opt/healthflow/provision-droplet.sh
+    encoding: b64
     permissions: '0755'
-
-  # Backup script
-  - path: /opt/healthflow/backup.sh
-    content: |
-      #!/bin/bash
-      set -e
-      
-      BACKUP_DIR="/opt/healthflow/backups"
-      DATE=$(date +%Y%m%d_%H%M%S)
-      
-      mkdir -p $BACKUP_DIR
-      
-      # Backup PostgreSQL
-      docker exec healthflow-db pg_dumpall -U healthflow > $BACKUP_DIR/postgres_$DATE.sql
-      
-      # Backup volumes
-      tar -czf $BACKUP_DIR/volumes_$DATE.tar.gz /var/lib/docker/volumes/healthflow*
-      
-      # Keep only last 7 days
-      find $BACKUP_DIR -type f -mtime +7 -delete
-      
-      echo "Backup completed: $DATE"
-    permissions: '0755'
-
-  # Health check script
-  - path: /opt/healthflow/healthcheck.sh
-    content: |
-      #!/bin/bash
-      
-      check_service() {
-        local name=$1
-        local url=$2
-        if curl -sf "$url" > /dev/null 2>&1; then
-          echo "✓ $name is healthy"
-          return 0
-        else
-          echo "✗ $name is not responding"
-          return 1
-        fi
-      }
-      
-      echo "=== HealthFlow Service Health Check ==="
-      echo ""
-      
-      check_service "Registry API" "http://localhost:8081/health"
-      check_service "Keycloak" "http://localhost:8080/health/ready"
-      check_service "Elasticsearch" "http://localhost:9200/_cluster/health"
-      check_service "Credentials Service" "http://localhost:3000/health"
-      
-      echo ""
-      echo "=== Docker Container Status ==="
-      docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-    permissions: '0755'
+    content: ${provision_b64}
 
 runcmd:
-  # Install Docker
-  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-  - apt-get update
-  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-  
-  # Start and enable Docker
-  - systemctl start docker
-  - systemctl enable docker
-  
-  # Add users to docker group
-  - usermod -aG docker healthflow
-  - usermod -aG docker ubuntu
-  
-  # Apply sysctl settings
-  - sysctl -p /etc/sysctl.d/99-elasticsearch.conf
-  
-  # Configure firewall
-  - ufw default deny incoming
-  - ufw default allow outgoing
-  - ufw allow ssh
-  - ufw allow http
-  - ufw allow https
-  - ufw allow 8080/tcp  # Keycloak
-  - ufw allow 8081/tcp  # Registry
-  - ufw --force enable
-  
-  # Start fail2ban
-  - systemctl enable fail2ban
-  - systemctl start fail2ban
-  
-  # Mount data volume (if attached)
-  - |
-    if [ -b /dev/sda ]; then
-      mkdir -p /mnt/healthflow-data
-      if ! blkid /dev/sda | grep -q ext4; then
-        mkfs.ext4 /dev/sda
-      fi
-      mount /dev/sda /mnt/healthflow-data
-      echo '/dev/sda /mnt/healthflow-data ext4 defaults,nofail 0 2' >> /etc/fstab
-    fi
-  
-  # Create deployment directory
-  - mkdir -p /opt/healthflow
-  - chown -R healthflow:healthflow /opt/healthflow
-  
-  # Setup cron for backups
-  - echo "0 2 * * * /opt/healthflow/backup.sh >> /var/log/healthflow-backup.log 2>&1" | crontab -u healthflow -
-  
-  # Clone repository
-  - |
-    cd /opt/healthflow
-    git clone https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core.git || true
-  
-  # Set permissions
-  - chown -R healthflow:healthflow /opt/healthflow
+  - [ bash, /opt/healthflow/provision-droplet.sh ]
 
 final_message: |
-  HealthFlow Sunbird RC server initialization complete!
-  
-  Next steps:
-  1. SSH into the server: ssh healthflow@<IP_ADDRESS>
-  2. Navigate to: cd /opt/healthflow/Healthflow-HCP-rc-core
-  3. Configure environment: cp .env.example .env && nano .env
-  4. Deploy services: ./scripts/deploy.sh
-  
-  For health check: /opt/healthflow/healthcheck.sh
+  HealthFlow HCP Registry provisioning finished.
+  - Credentials:   /opt/healthflow/credentials.txt
+  - Provision log: /var/log/healthflow-provision.log
+  - Status:        cd /opt/healthflow/docker && docker compose -f docker-compose.production.yml ps

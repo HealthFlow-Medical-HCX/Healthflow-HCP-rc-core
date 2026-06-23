@@ -141,15 +141,25 @@ mkdir -p /opt/healthflow/sunbird-rc
 mkdir -p /opt/healthflow/backups
 chown -R healthflow:healthflow /opt/healthflow
 
-# Clone repository
-log_info "Cloning repository..."
+# Obtain the repository.
+# NOTE: this is a PRIVATE repository, so an anonymous clone will fail. Provide a
+# GitHub token via GITHUB_TOKEN for an authenticated clone, or pre-copy the repo
+# to /opt/healthflow/Healthflow-HCP-rc-core (e.g. with scp/rsync) before running.
+log_info "Obtaining repository..."
 cd /opt/healthflow
-if [ -d "Healthflow-HCP-rc-core" ]; then
+if [ -d "Healthflow-HCP-rc-core/.git" ]; then
     cd Healthflow-HCP-rc-core
-    git pull origin main
+    git pull || log_warning "git pull failed (continuing with existing checkout)"
+elif [ -d "Healthflow-HCP-rc-core" ]; then
+    log_info "Using pre-copied repository (no .git present)."
+    cd Healthflow-HCP-rc-core
+elif [ -n "${GITHUB_TOKEN:-}" ]; then
+    git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core.git"
+    cd Healthflow-HCP-rc-core
 else
-    git clone https://github.com/HealthFlow-Medical-HCX/Healthflow-HCP-rc-core.git
-    cd Healthflow-HCP-rc-core
+    log_error "Repository not found and GITHUB_TOKEN not set."
+    log_error "Either copy the repo to /opt/healthflow/Healthflow-HCP-rc-core or export GITHUB_TOKEN."
+    exit 1
 fi
 
 # Copy docker configuration
