@@ -154,7 +154,12 @@ services:
     environment:
       DATABASE_URL: postgres://${DB_USER:-healthflow}:${DB_PASSWORD}@db:5432/identity
       VAULT_ADDR: http://vault:8200
+      VAULT_BASE_URL: http://vault:8200/v1
+      VAULT_ROOT_PATH: kv
+      VAULT_TIMEOUT: "5000"
+      VAULT_PROXY: "false"
       VAULT_TOKEN: ${VAULT_TOKEN:-healthflow-vault-token}
+      SIGNING_ALGORITHM: ED25519
       ENABLE_AUTH: "false"
     depends_on:
       - db
@@ -201,7 +206,17 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/healthflow-data/postgres_data
   es_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/healthflow-data/es_data
 
 networks:
   healthflow-network:
