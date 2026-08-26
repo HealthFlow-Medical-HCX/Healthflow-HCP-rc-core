@@ -1,4 +1,4 @@
-FROM jboss/keycloak:14.0.0
+FROM quay.io/keycloak/keycloak:14.0.0
 
 ADD themes /opt/jboss/keycloak/themes
 ADD providers /opt/jboss/keycloak/providers

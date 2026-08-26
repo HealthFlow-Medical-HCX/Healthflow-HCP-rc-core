@@ -31,14 +31,21 @@ services:
       - connectionInfo_uri=jdbc:postgresql://db:5432/registry
       - connectionInfo_username=postgres
       - connectionInfo_password=postgres
-      - elastic_search_connection_url=es:9200
-      - search_providerName=dev.sunbirdrc.registry.service.ElasticSearchService
+      - # elastic_search_connection_url=es:9200
+      - search_providerName=dev.sunbirdrc.registry.service.NativeSearchService
       - sunbird_sso_realm=sunbird-rc
       - sunbird_sso_url=http://keycloak:8080/auth
       - sunbird_sso_admin_client_id=admin-api
       - sunbird_sso_client_id=registry-frontend
       - sunbird_sso_admin_client_secret=0358fa30-6014-4192-9551-7c61b15b774c
       - claims_url=http://claim-ms:8082
+      - sign_health_check_url=http://certificate-signer:8079/
+      - encryption_base=http://certificate-signer:8079
+      - encryption_uri=http://certificate-signer:8079/encrypt
+      - encryption_batch_uri=http://certificate-signer:8079/encrypt/obj
+      - decryption_uri=http://certificate-signer:8079/decrypt
+      - decryption_batch_uri=http://certificate-signer:8079/decrypt/obj
+      - keys_url=http://certificate-signer:8079/keys/
     ports:
       - "8081:8081"
     depends_on:
@@ -69,7 +76,7 @@ services:
       timeout: 10s
       retries: 5
     ports:
-      - "8080:8080"
+      - "8085:8080"
       - "9990:9990"
     depends_on:
       db:
